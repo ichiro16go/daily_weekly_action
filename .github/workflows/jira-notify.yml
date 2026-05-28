@@ -1,0 +1,60 @@
+name: Jira 日報・週報 Slack通知
+
+on:
+  schedule:
+    # 日報: 月〜金 17:00 JST (= UTC 08:00)
+    - cron: '0 8 * * 1-5'
+    # 週報: 金曜 17:05 JST (= UTC 08:05) — 日報の直後に送信
+    - cron: '5 8 * * 5'
+  workflow_dispatch:
+    inputs:
+      report_type:
+        description: '実行するレポート種別'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - weekly
+          - both
+
+jobs:
+  daily-report:
+    name: 日報送信
+    # 日報: 月〜金 (スケジュール) または手動で daily/both を選んだとき
+    if: >
+      github.event_name == 'schedule' && github.event.schedule == '0 8 * * 1-5' ||
+      github.event_name == 'workflow_dispatch' && (inputs.report_type == 'daily' || inputs.report_type == 'both')
+    runs-on: ubuntu-latest
+    env:
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 日報を Slack に送信
+        run: python3 jira_monitor.py --daily --notify slack
+
+  weekly-report:
+    name: 週報送信
+    # 週報: 金曜スケジュール または手動で weekly/both を選んだとき
+    if: >
+      github.event_name == 'schedule' && github.event.schedule == '5 8 * * 5' ||
+      github.event_name == 'workflow_dispatch' && (inputs.report_type == 'weekly' || inputs.report_type == 'both')
+    runs-on: ubuntu-latest
+    env:
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 週報を Slack に送信
+        run: python3 jira_monitor.py --weekly --notify slack

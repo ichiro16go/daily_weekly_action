@@ -1,70 +1,85 @@
-# Jira 停滞チケット監視スクリプト
+# Jira 日報・週報 Slack通知
 
 ## 概要
 
-`jira_monitor.py` — JPREQ プロジェクトの停滞チケットを検出し、Slack に通知するスクリプト。
+`jira_monitor.py` — ボード1649（EPG 運用保守）のチケットを集計し、Slack に日報・週報を送信するスクリプト。
 
-## セットアップ
+- **日報** (`--daily`): 月〜金 17:00 に当日更新チケットを担当者別で通知
+- **週報** (`--weekly`): 金曜 17:00 に4週間クローズ推移・担当者別集計を通知
+
+## セットアップ（ローカル実行）
 
 ```bash
 # 1. 環境変数ファイルを作成
-cp master/scripts/.env.example master/scripts/.env
+cp .env.example .env
 
 # 2. .env を編集して実際の値を設定
+#   JIRA_BASE_URL   : https://yoursite.atlassian.net
 #   JIRA_EMAIL      : 自分の Atlassian アカウントのメールアドレス
 #   JIRA_API_TOKEN  : https://id.atlassian.com/manage-profile/security/api-tokens で発行
-#   SLACK_WEBHOOK_URL: Slack アプリ管理画面で取得（任意）
+#   SLACK_WEBHOOK_URL: Slack アプリ管理画面で取得
 
 # 3. 環境変数を読み込む
-source master/scripts/.env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL
+source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL
 ```
 
 ## 使い方
 
 ```bash
-# 停滞チケット一覧（3日以上 IN PROGRESS）を標準出力
-python3 master/scripts/jira_monitor.py --check stale
+# 日報を標準出力
+python3 jira_monitor.py --daily
 
-# 停滞の閾値を変更（7日以上）
-python3 master/scripts/jira_monitor.py --check stale --stale-days 7
+# 日報を Slack に送信
+python3 jira_monitor.py --daily --notify slack
 
-# Slack に通知
-python3 master/scripts/jira_monitor.py --check stale --notify slack
+# 週報を標準出力
+python3 jira_monitor.py --weekly
 
-# 週次サマリーを標準出力
-python3 master/scripts/jira_monitor.py --weekly
-
-# 週次サマリーを Slack に通知
-python3 master/scripts/jira_monitor.py --weekly --notify slack
+# 週報を Slack に送信
+python3 jira_monitor.py --weekly --notify slack
 ```
 
-## 定期実行（cron）
+## GitHub Actions による定期自動実行
 
-```cron
-# 毎朝 9:00 に停滞チェック（平日のみ）
-0 9 * * 1-5 cd /home/ichiro/dev && source master/scripts/.env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL && python3 master/scripts/jira_monitor.py --check stale --notify slack
+**スケジュール:**
+- 日報: 月〜金 17:00 JST に自動送信
+- 週報: 金曜 17:05 JST に自動送信（日報の直後）
 
-# 毎週月曜 9:30 に週次サマリー
-30 9 * * 1 cd /home/ichiro/dev && source master/scripts/.env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL && python3 master/scripts/jira_monitor.py --weekly --notify slack
-```
+### Secrets の登録手順
+
+1. GitHub リポジトリの **Settings** → **Secrets and variables** → **Actions** を開く
+2. **New repository secret** から以下の4つを登録する:
+
+| Secret名 | 値 |
+|---------|---|
+| `JIRA_BASE_URL` | `https://yoursite.atlassian.net` |
+| `JIRA_EMAIL` | Atlassian アカウントのメールアドレス |
+| `JIRA_API_TOKEN` | [API トークン](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `SLACK_WEBHOOK_URL` | Slack アプリの Incoming Webhook URL |
+
+3. Actions タブ → **Jira 日報・週報 Slack通知** → **Run workflow** で手動テスト可能
+
+### 手動実行
+
+Actions タブから `workflow_dispatch` で `daily` / `weekly` / `both` を選んで手動実行できます。
 
 ## ファイル構成
 
 ```
-master/scripts/
-├── .env.example       # 環境変数テンプレート（コミット可）
-├── .env               # 実際の値（.gitignore に追加すること）
-├── config.py          # 環境変数の読み込み
-├── jira_monitor.py    # メインスクリプト
+├── .env.example          # 環境変数テンプレート（コミット可）
+├── .env                  # 実際の値（.gitignore 済み・コミット不可）
+├── config.py             # 環境変数の読み込み・JQL定義
+├── jira_monitor.py       # メインスクリプト
 ├── notifiers/
 │   ├── __init__.py
-│   └── slack.py       # Slack Webhook 通知
-└── README.md
+│   └── slack.py          # Slack Webhook 通知
+└── .github/
+    └── workflows/
+        └── jira-notify.yml  # GitHub Actions 定期実行設定
 ```
 
 ## 注意事項
 
-- `.env` は絶対にコミットしないこと（`.gitignore` に追加済みであることを確認）
+- `.env` は絶対にコミットしないこと（`.gitignore` に追加済み）
 - `JIRA_API_TOKEN` は個人のトークン。チームで共有しない
-# daily_weekly_action
-# daily_weekly_action
+
