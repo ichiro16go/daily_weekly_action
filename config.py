@@ -19,7 +19,6 @@ BOARD_BASE_JQL = (
     " AND status NOT IN (Done, 完了, レビュー完了, Close, Rejected, Resolved,"
     " 取り下げ, レビュー済み, 切り戻し, 却下, 解決済み, リリース済み, ペンディング)"
     " AND issuetype NOT IN (Phase, \"Sub-task\", サブタスク)"
-    " AND (issueLinkType NOT IN (親チケット) OR issueLinkType IS EMPTY)"
 )
 
 # statusフィルタなし版（クローズ済みチケットの集計に使用）
@@ -34,7 +33,6 @@ BOARD_MEMBER_BASE_JQL = (
     "712020:d75d4ac0-7f94-46dd-b6e4-14a152e4c590"
     ") OR (assignee IS EMPTY AND project IN (\"グルメ作業依頼\", JPREQ)))"
     " AND issuetype NOT IN (Phase, \"Sub-task\", サブタスク)"
-    " AND (issueLinkType NOT IN (親チケット) OR issueLinkType IS EMPTY)"
 )
 
 

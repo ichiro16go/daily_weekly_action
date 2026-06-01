@@ -427,8 +427,10 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
 
     assignee_stats = sorted(
         assignee_map.values(),
-        key=lambda x: len(x.completed) + len(x.in_progress) + len(x.pending),
-        reverse=True,
+        key=lambda x: (
+            x.name == "未アサイン",
+            -(len(x.completed) + len(x.in_progress) + len(x.pending)),
+        ),
     )
     return DailyReport(
         date=today_str,
@@ -443,6 +445,7 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
 # フォーマッター
 # ---------------------------------------------------------------------------
 
+# 日報のフォーマッター。更新のあったチケットを担当者別に表示し、更新なしもデバッグ用に表示する。停滞チケットは別途週次レポートで表示する想定。
 def format_daily(r: DailyReport) -> str:
     active_stats = [
         stat for stat in r.assignee_stats
@@ -454,6 +457,7 @@ def format_daily(r: DailyReport) -> str:
     ]
     lines = [
         f"📋 運用保守チーム 日報 ({r.date})",
+        "本日の更新チケット一覧（更新のあったチケットのみ、担当者別に表示）",
         "━" * 60,
         f"✅ 本日完了: {r.closed_count}件　📥 新規起票: {r.new_tickets_count}件　🔄 対応中: {r.in_progress_count}件",
         "",
@@ -504,7 +508,7 @@ def _bar(count: int, max_count: int, width: int = 10) -> str:
     filled = round(count / max_count * width) if max_count > 0 else 0
     return "█" * filled + "░" * (width - filled)
 
-
+# 週次レポートのフォーマッター。ASCII棒グラフでトレンドを表示し、担当者別統計と停滞・期限超過・未アサインチケットの詳細も表示する。
 def format_weekly(s: WeeklySummary) -> str:
     today = datetime.now(tz=JST).strftime("%Y-%m-%d")
     lines = [
