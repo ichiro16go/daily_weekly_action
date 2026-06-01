@@ -36,6 +36,14 @@ class StaleTicket:
 
 
 @dataclass
+class TicketBrief:
+    key: str
+    summary: str
+    assignee: str
+    detail: str = ""
+
+
+@dataclass
 class AssigneeStat:
     name: str
     closed_this_week: int
@@ -44,7 +52,13 @@ class AssigneeStat:
 
 @dataclass
 class WeeklySummary:
+    period_label: str
     stale: list[StaleTicket]
+    overdue: list[TicketBrief]
+    unassigned: list[TicketBrief]
+    new_tickets_count: int
+    closed_count: int
+    delta_count: int
     overdue_count: int
     unassigned_count: int
     in_progress_count: int
@@ -164,6 +178,55 @@ class JiraClient:
 # ---------------------------------------------------------------------------
 
 JST = timezone(timedelta(hours=9))
+CLOSE_STATUSES = ("Done", "完了", "Close", "Resolved", "解決済み", "リリース済み")
+
+
+def _jql_quote(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _jql_list(values: tuple[str, ...]) -> str:
+    return ", ".join(_jql_quote(v) for v in values)
+
+
+def _jql_datetime(dt: datetime) -> str:
+    return _jql_quote(dt.astimezone(JST).strftime("%Y/%m/%d %H:%M"))
+
+
+def _closed_transition_jql(after: str, before: str | None = None) -> str:
+    clauses = []
+    for status in CLOSE_STATUSES:
+        clause = f"status CHANGED TO {_jql_quote(status)} AFTER {after}"
+        if before:
+            clause = f"{clause} BEFORE {before}"
+        clauses.append(clause)
+    return f"status IN ({_jql_list(CLOSE_STATUSES)}) AND ({' OR '.join(clauses)})"
+
+
+def _assignee_name(issue: dict) -> str:
+    return (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+
+
+def _summary(issue: dict, limit: int = 60) -> str:
+    return issue["fields"]["summary"][:limit]
+
+
+def _brief(issue: dict, detail: str = "") -> TicketBrief:
+    return TicketBrief(
+        key=issue["key"],
+        summary=_summary(issue),
+        assignee=_assignee_name(issue),
+        detail=detail,
+    )
+
+
+def _period_label(start: datetime, end: datetime) -> str:
+    return (
+        f"{start.astimezone(JST).strftime('%Y-%m-%d %H:%M')}"
+        f" 〜 {end.astimezone(JST).strftime('%Y-%m-%d %H:%M')}（直近7日）"
+    )
+
 
 def _parse_jira_dt(s: str) -> datetime:
     """Jira の updated 文字列を datetime に変換"""
@@ -195,7 +258,16 @@ def check_stale(client: JiraClient, conf: cfg.Config, stale_days: int = 3) -> li
 def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     stale = check_stale(client, conf, stale_days=7)
 
-    close_statuses = '"Done", "完了", "Close", "Resolved", "解決済み", "リリース済み"'
+    period_end = datetime.now(tz=JST).replace(second=0, microsecond=0)
+    period_start = period_end - timedelta(days=7)
+    period_start_jql = _jql_datetime(period_start)
+    period_end_jql = _jql_datetime(period_end)
+    closed_period_jql = _closed_transition_jql(period_start_jql, before=period_end_jql)
+    created_period_jql = f"created >= {period_start_jql} AND created <= {period_end_jql}"
+
+    new_tickets_count = client.count(conf.board_member_jql(created_period_jql))
+    closed_count = client.count(conf.board_member_jql(closed_period_jql))
+    delta_count = new_tickets_count - closed_count
     overdue_count = client.count(conf.board_jql('duedate < now()'))
     unassigned_count = client.count(conf.board_jql('assignee IS EMPTY'))
     in_progress_count = client.count(conf.board_jql('status = "In PROGRESS"'))
@@ -203,14 +275,14 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     # 4週分クローズ件数トレンド（board_member_jql = ボードメンバー限定・statusフィルタなし）
     trend_4w = []
     week_ranges = [
-        "updated >= -4w AND updated < -3w",
-        "updated >= -3w AND updated < -2w",
-        "updated >= -2w AND updated < -1w",
-        "updated >= -1w",
+        (period_end - timedelta(days=28), period_end - timedelta(days=21)),
+        (period_end - timedelta(days=21), period_end - timedelta(days=14)),
+        (period_end - timedelta(days=14), period_end - timedelta(days=7)),
+        (period_start, period_end),
     ]
-    for range_jql in week_ranges:
+    for start, end in week_ranges:
         count = client.count(
-            conf.board_member_jql(f'status IN ({close_statuses}) AND {range_jql}')
+            conf.board_member_jql(_closed_transition_jql(_jql_datetime(start), before=_jql_datetime(end)))
         )
         trend_4w.append(count)
 
@@ -227,31 +299,52 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         max_results=500,
     )
     closed_week_issues = client.search(
-        conf.board_member_jql(f'status IN ({close_statuses}) AND updated >= -1w'),
+        conf.board_member_jql(closed_period_jql),
         ["assignee"],
         max_results=500,
+    )
+    overdue_issues = client.search(
+        conf.board_jql('duedate < now()', order_by="duedate ASC"),
+        ["summary", "assignee", "duedate"],
+        max_results=5,
+    )
+    unassigned_issues = client.search(
+        conf.board_jql('assignee IS EMPTY', order_by="created ASC"),
+        ["summary", "assignee", "created"],
+        max_results=5,
     )
 
     assignee_map: dict[str, AssigneeStat] = {}
     for issue in all_board_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         if name not in assignee_map:
             assignee_map[name] = AssigneeStat(name=name, closed_this_week=0, in_progress=0)
     for issue in in_progress_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         if name not in assignee_map:
             assignee_map[name] = AssigneeStat(name=name, closed_this_week=0, in_progress=0)
         assignee_map[name].in_progress += 1
     for issue in closed_week_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         if name not in assignee_map:
             assignee_map[name] = AssigneeStat(name=name, closed_this_week=0, in_progress=0)
         assignee_map[name].closed_this_week += 1
 
     assignee_stats = sorted(assignee_map.values(), key=lambda x: x.closed_this_week, reverse=True)
+    overdue = [
+        _brief(issue, detail=f"期限: {issue['fields'].get('duedate') or '-'}")
+        for issue in overdue_issues
+    ]
+    unassigned = [_brief(issue) for issue in unassigned_issues]
 
     return WeeklySummary(
+        period_label=_period_label(period_start, period_end),
         stale=stale,
+        overdue=overdue,
+        unassigned=unassigned,
+        new_tickets_count=new_tickets_count,
+        closed_count=closed_count,
+        delta_count=delta_count,
         overdue_count=overdue_count,
         unassigned_count=unassigned_count,
         in_progress_count=in_progress_count,
@@ -266,17 +359,18 @@ _PENDING_LIKE = {"ペンディング", "Pending", "確認中", "保留", "待ち
 
 def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
     today_str = datetime.now(tz=JST).strftime("%Y-%m-%d")
-    pjq = conf.projects_jql()
-    close_statuses = '"Done", "完了", "Close", "Resolved", "解決済み", "リリース済み"'
 
-    # 今日クローズしたチケット（ボードJQLは完了除外なので projects_jql ベース）
+    # 今日クローズしたチケット（ボードJQLは完了除外なので board_member_jql ベース）
+    closed_extra_jql = _closed_transition_jql("startOfDay()")
+    closed_count = client.count(conf.board_member_jql(closed_extra_jql))
+    closed_jql = conf.board_member_jql(closed_extra_jql, order_by="assignee ASC")
     closed_issues = client.search(
-        f'{pjq} AND status IN ({close_statuses}) AND updated >= startOfDay()',
+        closed_jql,
         ["summary", "assignee", "status"],
         max_results=200,
     )
-    # 今日新規起票（ボードJQLベース）
-    new_count = client.count(conf.board_jql('created >= startOfDay()'))
+    # 今日新規起票（完了済みも含めるため board_member_jql ベース）
+    new_count = client.count(conf.board_member_jql('created >= startOfDay()'))
     # 現在アクティブな件数（ボードJQLがそのままアクティブ件数）
     in_progress_count = client.count(conf.board_jql())
 
@@ -304,24 +398,24 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
 
     # 全ボードメンバーを空エントリで初期化（更新0件でも名前を表示するため）
     for issue in all_board_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         get_or_create(name)
 
     for issue in closed_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         get_or_create(name).completed.append(DailyTicket(
             key=issue["key"],
-            summary=issue["fields"]["summary"][:50],
+            summary=_summary(issue, limit=50),
             assignee=name,
             status="Close",
         ))
 
     for issue in today_active_issues:
-        name = (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+        name = _assignee_name(issue)
         status_name = (issue["fields"].get("status") or {}).get("name", "")
         ticket = DailyTicket(
             key=issue["key"],
-            summary=issue["fields"]["summary"][:50],
+            summary=_summary(issue, limit=50),
             assignee=name,
             status=status_name,
         )
@@ -333,12 +427,12 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
 
     assignee_stats = sorted(
         assignee_map.values(),
-        key=lambda x: len(x.completed) + len(x.in_progress),
+        key=lambda x: len(x.completed) + len(x.in_progress) + len(x.pending),
         reverse=True,
     )
     return DailyReport(
         date=today_str,
-        closed_count=len(closed_issues),
+        closed_count=closed_count,
         new_tickets_count=new_count,
         in_progress_count=in_progress_count,
         assignee_stats=assignee_stats,
@@ -350,6 +444,14 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
 # ---------------------------------------------------------------------------
 
 def format_daily(r: DailyReport) -> str:
+    active_stats = [
+        stat for stat in r.assignee_stats
+        if len(stat.completed) + len(stat.in_progress) + len(stat.pending) > 0
+    ]
+    inactive_names = [
+        stat.name for stat in r.assignee_stats
+        if len(stat.completed) + len(stat.in_progress) + len(stat.pending) == 0
+    ]
     lines = [
         f"📋 運用保守チーム 日報 ({r.date})",
         "━" * 60,
@@ -357,20 +459,24 @@ def format_daily(r: DailyReport) -> str:
         "",
     ]
 
-    if not r.assignee_stats:
+    if not active_stats:
         lines.append("本日の更新なし")
-        return "\n".join(lines)
-
-    lines.append("─ 担当者別 ─")
-    for stat in r.assignee_stats:
-        lines.append(f"👤 {stat.name}")
-        for t in stat.completed:
-            lines.append(f"  ✅ {t.key}  {t.summary}")
-        for t in stat.in_progress:
-            lines.append(f"  🔄 {t.key}  {t.summary}")
-        for t in stat.pending:
-            lines.append(f"  ⏸ {t.key}  {t.summary}  （{t.status}）")
         lines.append("")
+    else:
+        lines.append("─ 担当者別 ─")
+        for stat in active_stats:
+            lines.append(f"👤 {stat.name}")
+            for t in stat.completed:
+                lines.append(f"  ✅ {t.key}  {t.summary}")
+            for t in stat.in_progress:
+                lines.append(f"  🔄 {t.key}  {t.summary}")
+            for t in stat.pending:
+                lines.append(f"  ⏸ {t.key}  {t.summary}  （{t.status}）")
+            lines.append("")
+
+    if inactive_names:
+        lines.append("─ 更新なし（デバッグ用） ─")
+        lines.append(f"  {' / '.join(inactive_names)}")
 
     return "\n".join(lines).rstrip()
 
@@ -403,6 +509,7 @@ def format_weekly(s: WeeklySummary) -> str:
     today = datetime.now(tz=JST).strftime("%Y-%m-%d")
     lines = [
         f"📊 運用保守チーム 週次レポート ({today})",
+        f"対象期間: {s.period_label}",
         "━" * 60,
     ]
 
@@ -423,16 +530,40 @@ def format_weekly(s: WeeklySummary) -> str:
     lines.append("")
 
     # サマリー
+    delta_prefix = "+" if s.delta_count > 0 else ""
     lines += [
         "─ サマリー ─",
+        f"  📥 新規起票:                  {s.new_tickets_count}件",
+        f"  ✅ 完了:                      {s.closed_count}件",
+        f"  📊 増減（新規-完了）:          {delta_prefix}{s.delta_count}件",
         f"  🔄 IN PROGRESS 合計:          {s.in_progress_count}件",
         f"  ⚠️  期限超過:                  {s.overdue_count}件",
         f"  👤 担当者未アサイン:            {s.unassigned_count}件",
         "",
+        f"⚠️  期限超過チケット — {s.overdue_count}件",
+    ]
+    for t in s.overdue:
+        detail = f"  {t.detail}" if t.detail else ""
+        lines.append(f"  {t.key}  {t.assignee}{detail}  {t.summary}")
+    if s.overdue_count > len(s.overdue):
+        lines.append(f"  …他 {s.overdue_count - len(s.overdue)}件")
+    lines += [
+        "",
+        f"👤 担当者未アサインチケット — {s.unassigned_count}件",
+    ]
+    for t in s.unassigned:
+        lines.append(f"  {t.key}  {t.summary}")
+    if s.unassigned_count > len(s.unassigned):
+        lines.append(f"  …他 {s.unassigned_count - len(s.unassigned)}件")
+    lines += [
+        "",
         f"🚨 滞留チケット（7日以上 IN PROGRESS）— {len(s.stale)}件",
     ]
     for t in s.stale[:5]:
-        lines.append(f"  {t.key}  {t.assignee}  ({t.days_stale}日前)  {t.summary}")
+        lines.append(
+            f"  {t.key}  {t.assignee}  最終更新: {t.updated.strftime('%Y-%m-%d')} "
+            f"({t.days_stale}日前)  {t.summary}"
+        )
     if len(s.stale) > 5:
         lines.append(f"  …他 {len(s.stale) - 5}件")
     return "\n".join(lines)
