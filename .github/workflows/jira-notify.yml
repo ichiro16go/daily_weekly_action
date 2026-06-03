@@ -1,11 +1,8 @@
 name: Jira 日報・週報 Slack通知
 
+# cron-job.org から workflow_dispatch で呼び出すことで定刻実行を実現する。
+# GitHub Actions の schedule は遅延が大きいため使用しない。
 on:
-  schedule:
-    # 日報: 月〜金 17:00 JST (= UTC 08:00)
-    - cron: "0 8 * * 1-5"
-    # 週報: 金曜 17:05 JST (= UTC 08:05) — 日報の直後に送信
-    - cron: "5 8 * * 5"
   workflow_dispatch:
     inputs:
       report_type:
@@ -21,10 +18,7 @@ on:
 jobs:
   daily-report:
     name: 日報送信
-    # 日報: 月〜金 (スケジュール) または手動で daily/both を選んだとき
-    if: >
-      github.event_name == 'schedule' && github.event.schedule == '0 8 * * 1-5' ||
-      github.event_name == 'workflow_dispatch' && (inputs.report_type == 'daily' || inputs.report_type == 'both')
+    if: inputs.report_type == 'daily' || inputs.report_type == 'both'
     runs-on: ubuntu-latest
     env:
       JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
@@ -41,10 +35,7 @@ jobs:
 
   weekly-report:
     name: 週報送信
-    # 週報: 金曜スケジュール または手動で weekly/both を選んだとき
-    if: >
-      github.event_name == 'schedule' && github.event.schedule == '5 8 * * 5' ||
-      github.event_name == 'workflow_dispatch' && (inputs.report_type == 'weekly' || inputs.report_type == 'both')
+    if: inputs.report_type == 'weekly' || inputs.report_type == 'both'
     runs-on: ubuntu-latest
     env:
       JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
