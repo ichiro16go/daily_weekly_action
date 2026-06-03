@@ -371,8 +371,8 @@ def build_daily_report(client: JiraClient, conf: cfg.Config) -> DailyReport:
     )
     # 今日新規起票（完了済みも含めるため board_member_jql ベース）
     new_count = client.count(conf.board_member_jql('created >= startOfDay()'))
-    # 現在アクティブな件数（ボードJQLがそのままアクティブ件数）
-    in_progress_count = client.count(conf.board_jql())
+    # 現在アクティブな件数（実際に着手中 = In PROGRESS のみ）
+    in_progress_count = client.count(conf.board_jql('status = "In PROGRESS"'))
 
     # 全ボードメンバーを先に列挙（assigneeのみ取得でAPI負荷を抑える）
     all_board_issues = client.search(

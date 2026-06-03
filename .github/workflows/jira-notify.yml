@@ -3,9 +3,9 @@ name: Jira 日報・週報 Slack通知
 on:
   schedule:
     # 日報: 月〜金 17:00 JST (= UTC 08:00)
-    - cron: "52 7 * * 1-5"
+    - cron: "0 8 * * 1-5"
     # 週報: 金曜 17:05 JST (= UTC 08:05) — 日報の直後に送信
-    - cron: "57 7 * * 5"
+    - cron: "5 8 * * 5"
   workflow_dispatch:
     inputs:
       report_type:
