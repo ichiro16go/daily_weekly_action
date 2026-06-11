@@ -26,7 +26,8 @@ export default function RankingPage() {
                 <tr key={t.key} className="border-t border-gray-100 dark:border-gray-800">
                   <td className="px-4 py-2 text-gray-400">{i + 1}</td>
                   <td className="px-4 py-2">
-                    <span className="font-mono text-blue-600 dark:text-blue-400">{t.key}</span>
+                    <a href={t.url || `#`} target="_blank" rel="noopener noreferrer"
+                       className="font-mono text-blue-600 dark:text-blue-400 hover:underline">{t.key}</a>
                     <span className="ml-2">{t.summary}</span>
                   </td>
                   <td className="px-4 py-2">{t.assignee}</td>
@@ -64,7 +65,8 @@ export default function RankingPage() {
                 <tr key={t.key} className="border-t border-gray-100 dark:border-gray-800">
                   <td className="px-4 py-2 text-gray-400">{i + 1}</td>
                   <td className="px-4 py-2">
-                    <span className="font-mono text-blue-600 dark:text-blue-400">{t.key}</span>
+                    <a href={t.url || `#`} target="_blank" rel="noopener noreferrer"
+                       className="font-mono text-blue-600 dark:text-blue-400 hover:underline">{t.key}</a>
                     <span className="ml-2">{t.summary}</span>
                   </td>
                   <td className="px-4 py-2">{t.assignee}</td>

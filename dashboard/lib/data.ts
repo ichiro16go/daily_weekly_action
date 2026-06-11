@@ -37,6 +37,7 @@ export interface StaleTicket {
   summary: string;
   assignee: string;
   days_stale: number;
+  url: string;
 }
 
 export interface OverdueTicket {
@@ -45,6 +46,7 @@ export interface OverdueTicket {
   assignee: string;
   duedate: string;
   days_overdue: number;
+  url: string;
 }
 
 export interface WipStatus {

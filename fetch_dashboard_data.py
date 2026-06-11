@@ -21,7 +21,8 @@ from statistics import median
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config as cfg
 from jira_monitor import (
-    JiraClient, JST, check_stale, _parse_jira_dt, _jql_datetime,
+    JiraClient, JST, CLOSE_STATUSES, check_stale, _parse_jira_dt, _jql_datetime,
+    _resolved_jql, _jql_list,
 )
 
 # ---------------------------------------------------------------------------
@@ -63,24 +64,26 @@ def _month_ranges(months: int = 6):
 
 
 def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
-    """指定期間にクローズされたチケットを返す"""
-    start_jql = _jql_datetime(start)
-    end_jql = _jql_datetime(end)
+    """指定期間にクローズされたチケットを返す（resolved フィールドベース）"""
     jql = conf.board_member_jql(
-        f'status IN (Done, 完了, Close, Resolved, 解決済み, リリース済み) '
-        f'AND status changed TO (Done, 完了, Close, Resolved, 解決済み, リリース済み) '
-        f'AFTER {start_jql} BEFORE {end_jql}'
+        f'{_resolved_jql(start, end)}{_label_filter(conf)}'
     )
     return client.search(jql, ["summary", "assignee", "created", "resolutiondate", "issuetype"], max_results=500)
 
 
 def _get_in_progress(client: JiraClient, conf: cfg.Config):
-    """現在IN PROGRESSのチケットを返す"""
-    jql = conf.board_member_jql(
-        'status = "In Progress"',
-        order_by="assignee ASC"
-    )
+    """現在IN PROGRESSのチケットを返す（ラベルフィルタ適用）"""
+    extra = f'status = "In Progress"{_label_filter(conf)}'
+    jql = conf.board_member_jql(extra, order_by="assignee ASC")
     return client.search(jql, ["summary", "assignee", "created", "updated", "duedate"], max_results=200)
+
+
+def _label_filter(conf: cfg.Config) -> str:
+    """ラベルフィルタJQL片を返す（先頭に AND 付き、空なら空文字）"""
+    if conf.weekly_labels:
+        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        return f' AND labels IN ({quoted})'
+    return ""
 
 
 def _assignee_name(issue) -> str:
@@ -218,13 +221,19 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
 
 def build_stale_ranking(client: JiraClient, conf: cfg.Config) -> list:
     """滞留チケットランキング"""
-    stale = check_stale(client, conf, stale_days=3)
+    label_filter = ""
+    if conf.weekly_labels:
+        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        label_filter = f'labels IN ({quoted})'
+    stale = check_stale(client, conf, stale_days=3, extra_filter=label_filter)
+    base_url = conf.base_url.rstrip("/")
     return [
         {
             "key": t.key,
             "summary": t.summary,
             "assignee": t.assignee,
             "days_stale": t.days_stale,
+            "url": f"{base_url}/browse/{t.key}",
         }
         for t in sorted(stale, key=lambda x: -x.days_stale)
     ]
@@ -234,10 +243,11 @@ def build_overdue_ranking(client: JiraClient, conf: cfg.Config) -> list:
     """期限超過チケットランキング"""
     now = datetime.now(tz=JST)
     jql = conf.board_jql(
-        f'duedate < "{now.strftime("%Y-%m-%d")}" AND duedate IS NOT EMPTY',
+        f'duedate < "{now.strftime("%Y-%m-%d")}" AND duedate IS NOT EMPTY{_label_filter(conf)}',
         order_by="duedate ASC"
     )
     issues = client.search(jql, ["summary", "assignee", "duedate"], max_results=50)
+    base_url = conf.base_url.rstrip("/")
     results = []
     for issue in issues:
         due_str = issue["fields"].get("duedate", "")
@@ -251,6 +261,7 @@ def build_overdue_ranking(client: JiraClient, conf: cfg.Config) -> list:
             "assignee": _assignee_name(issue),
             "duedate": due_str,
             "days_overdue": days_over,
+            "url": f"{base_url}/browse/{issue['key']}",
         })
     return sorted(results, key=lambda x: -x["days_overdue"])
 
@@ -258,6 +269,7 @@ def build_overdue_ranking(client: JiraClient, conf: cfg.Config) -> list:
 def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
     """WIP超過状況"""
     in_progress = _get_in_progress(client, conf)
+    base_url = conf.base_url.rstrip("/")
     by_member: dict[str, list] = {}
     for issue in in_progress:
         name = _assignee_name(issue)
@@ -267,6 +279,7 @@ def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
             "key": issue["key"],
             "summary": issue["fields"]["summary"],
             "days": (datetime.now(tz=JST) - _parse_jira_dt(issue["fields"]["updated"])).days,
+            "url": f"{base_url}/browse/{issue['key']}",
         })
 
     members = []
