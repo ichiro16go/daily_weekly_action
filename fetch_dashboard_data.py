@@ -285,6 +285,110 @@ def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
     }
 
 
+def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
+    """チームKPI進捗データを生成"""
+    from jira_monitor import _resolved_jql, _KPI_TARGET_WEEKLY_CLOSED, _KPI_TARGET_LT_MEDIAN
+
+    now = datetime.now(tz=JST)
+    year = now.year
+
+    # 半期判定
+    if 4 <= now.month <= 9:
+        half_start = datetime(year, 4, 1, tzinfo=JST)
+        half_end = datetime(year, 9, 30, 23, 59, 59, tzinfo=JST)
+        prev_start = datetime(year - 1, 10, 1, tzinfo=JST)
+        prev_end = datetime(year, 3, 31, 23, 59, 59, tzinfo=JST)
+        half_label = f"{year}上半期"
+        prev_label = f"{year - 1}下半期"
+    elif now.month >= 10:
+        half_start = datetime(year, 10, 1, tzinfo=JST)
+        half_end = datetime(year + 1, 3, 31, 23, 59, 59, tzinfo=JST)
+        prev_start = datetime(year, 4, 1, tzinfo=JST)
+        prev_end = datetime(year, 9, 30, 23, 59, 59, tzinfo=JST)
+        half_label = f"{year}下半期"
+        prev_label = f"{year}上半期"
+    else:
+        half_start = datetime(year - 1, 10, 1, tzinfo=JST)
+        half_end = datetime(year, 3, 31, 23, 59, 59, tzinfo=JST)
+        prev_start = datetime(year - 1, 4, 1, tzinfo=JST)
+        prev_end = datetime(year - 1, 9, 30, 23, 59, 59, tzinfo=JST)
+        half_label = f"{year - 1}下半期"
+        prev_label = f"{year - 1}上半期"
+
+    # ラベルフィルタ
+    label_filter = ""
+    if conf.weekly_labels:
+        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        label_filter = f' AND labels IN ({quoted})'
+
+    # 今半期の完了チケット
+    current_jql = f'{_resolved_jql(half_start, now)}{label_filter}'
+    current_issues = client.search(
+        conf.board_member_jql(current_jql),
+        ["created", "resolutiondate"],
+        max_results=500,
+    )
+    half_total = len(current_issues)
+
+    # リードタイム計算
+    lead_times = []
+    for issue in current_issues:
+        created_str = issue["fields"].get("created")
+        resolved_str = issue["fields"].get("resolutiondate")
+        if not created_str or not resolved_str:
+            continue
+        created = _parse_jira_dt(created_str)
+        resolved = _parse_jira_dt(resolved_str)
+        days = (resolved - created).days
+        if days >= 0:
+            lead_times.append(days)
+
+    lt_median = round(median(lead_times), 1) if lead_times else 0
+    lt_avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
+
+    # 経過週数
+    weeks_elapsed = round((now - half_start).days / 7.0, 1)
+    actual_weekly = round(half_total / weeks_elapsed, 1) if weeks_elapsed > 0 else 0
+
+    # 前期の完了数
+    prev_jql = f'{_resolved_jql(prev_start, prev_end)}{label_filter}'
+    prev_total = client.count(conf.board_member_jql(prev_jql))
+    prev_weeks = (prev_end - prev_start).days / 7.0
+    prev_weekly = round(prev_total / prev_weeks, 1) if prev_weeks > 0 else 0
+
+    # 残り週数と必要ペース
+    remaining_weeks = max((half_end - now).days / 7.0, 0.1)
+    target_total_by_end = _KPI_TARGET_WEEKLY_CLOSED * (weeks_elapsed + remaining_weeks)
+    needed_remaining = max(target_total_by_end - half_total, 0)
+    needed_weekly = round(needed_remaining / remaining_weeks, 1)
+
+    return {
+        "half_label": half_label,
+        "prev_label": prev_label,
+        "targets": {
+            "weekly_closed": _KPI_TARGET_WEEKLY_CLOSED,
+            "lead_time_median": _KPI_TARGET_LT_MEDIAN,
+        },
+        "current": {
+            "total_closed": half_total,
+            "weekly_closed": actual_weekly,
+            "weeks_elapsed": weeks_elapsed,
+            "lead_time_median": lt_median,
+            "lead_time_avg": lt_avg,
+            "lead_time_sample_count": len(lead_times),
+        },
+        "previous": {
+            "total_closed": prev_total,
+            "weekly_closed": prev_weekly,
+        },
+        "projection": {
+            "remaining_weeks": round(remaining_weeks, 1),
+            "needed_weekly_to_hit_target": needed_weekly,
+            "projected_total_at_current_pace": round(half_total + actual_weekly * remaining_weeks),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # メイン
 # ---------------------------------------------------------------------------
@@ -331,10 +435,14 @@ def main():
     wip = build_wip_status(client, conf)
     _write(out_dir / "wip_status.json", wip)
 
-    meta = {"updated_at": now_str, "data_files": 6}
+    print("🎯 KPI進捗を取得中...")
+    kpi = build_kpi_data(client, conf)
+    _write(out_dir / "kpi.json", kpi)
+
+    meta = {"updated_at": now_str, "data_files": 7}
     _write(out_dir / "meta.json", meta)
 
-    print(f"✅ 完了: {out_dir} に7ファイル出力")
+    print(f"✅ 完了: {out_dir} に8ファイル出力")
 
 
 def _write(path: Path, data):
