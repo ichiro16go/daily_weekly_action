@@ -43,6 +43,7 @@ class Config:
     api_token: str
     slack_webhook_url: str | None
     projects: list[str] = field(default_factory=lambda: list(DEFAULT_PROJECTS))
+    wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
 
     def projects_jql(self) -> str:
         """project in (JPREQ, EPGQC, ...) 形式の JQL 断片を返す"""
@@ -71,6 +72,7 @@ def load() -> Config:
 
     raw_projects = os.environ.get("JIRA_PROJECTS", "")
     projects = [p.strip() for p in raw_projects.split(",") if p.strip()] or list(DEFAULT_PROJECTS)
+    wip_limit = int(os.environ.get("WIP_LIMIT", "3"))
 
     missing = [k for k, v in [
         ("JIRA_BASE_URL", base_url),
@@ -87,5 +89,6 @@ def load() -> Config:
         api_token=api_token,
         slack_webhook_url=slack_webhook_url,
         projects=projects,
+        wip_limit=wip_limit,
     )
 

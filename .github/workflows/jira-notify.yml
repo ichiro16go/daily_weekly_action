@@ -1,51 +1,33 @@
-name: Jira 日報・週報 Slack通知
+name: Jira 週報 Slack通知
 
 # cron-job.org から workflow_dispatch で呼び出すことで定刻実行を実現する。
 # GitHub Actions の schedule は遅延が大きいため使用しない。
+# 日報のSlack投稿は廃止（Jiraに全データがあるため都度計算で十分）。
 on:
   workflow_dispatch:
     inputs:
       report_type:
         description: "実行するレポート種別"
         required: true
-        default: "daily"
+        default: "weekly"
         type: choice
         options:
-          - daily
           - weekly
-          - both
 
 jobs:
-  daily-report:
-    name: 日報送信
-    if: inputs.report_type == 'daily' || inputs.report_type == 'both'
-    runs-on: ubuntu-latest
-    env:
-      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
-      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: 日報を Slack に送信
-        run: python3 jira_monitor.py --daily --notify slack
-
   weekly-report:
     name: 週報送信
-    if: inputs.report_type == 'weekly' || inputs.report_type == 'both'
     runs-on: ubuntu-latest
     env:
       JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
       JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
       JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      WIP_LIMIT: "3"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: 週報を Slack に送信
+      - name: 週報を Slack に送信（Block Kit）
         run: python3 jira_monitor.py --weekly --notify slack

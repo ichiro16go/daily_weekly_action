@@ -51,6 +51,23 @@ class AssigneeStat:
 
 
 @dataclass
+class LeadTimeStat:
+    """月次リードタイム統計"""
+    month_label: str       # "2026-01" 形式
+    avg_days: float        # 平均リードタイム（日）
+    median_days: float     # 中央値リードタイム（日）
+    count: int             # サンプル数
+
+
+@dataclass
+class WipViolation:
+    """WIP上限超過"""
+    name: str
+    in_progress: int
+    limit: int
+
+
+@dataclass
 class WeeklySummary:
     period_label: str
     stale: list[StaleTicket]
@@ -64,6 +81,8 @@ class WeeklySummary:
     in_progress_count: int
     trend_4w: list[int]           # [3週前, 2週前, 先週, 今週] のクローズ件数
     assignee_stats: list[AssigneeStat]
+    lead_time_trend: list[LeadTimeStat] = None   # 月次リードタイム推移
+    wip_violations: list[WipViolation] = None    # WIP上限超過者
 
 
 @dataclass
@@ -255,6 +274,65 @@ def check_stale(client: JiraClient, conf: cfg.Config, stale_days: int = 3) -> li
     return tickets
 
 
+def _calc_lead_time_trend(client: JiraClient, conf: cfg.Config, months: int = 6) -> list:
+    """直近 N ヶ月のリードタイム（起票→解決の日数）を月次で集計する"""
+    from statistics import median
+
+    now = datetime.now(tz=JST)
+    results = []
+
+    for i in range(months, 0, -1):
+        # 各月の範囲を計算
+        month_end = now.replace(day=1) - timedelta(days=1) if i == 1 else \
+            now.replace(day=1) - timedelta(days=30 * (i - 1))
+        # 簡易的に月初〜月末を算出
+        year = now.year
+        month = now.month - i + 1
+        if month <= 0:
+            month += 12
+            year -= 1
+        month_start = datetime(year, month, 1, tzinfo=JST)
+        if month == 12:
+            month_end_dt = datetime(year + 1, 1, 1, tzinfo=JST) - timedelta(seconds=1)
+        else:
+            month_end_dt = datetime(year, month + 1, 1, tzinfo=JST) - timedelta(seconds=1)
+
+        month_label = f"{year}-{month:02d}"
+        start_jql = _jql_datetime(month_start)
+        end_jql = _jql_datetime(month_end_dt)
+
+        # その月にクローズされたチケットの created を取得
+        closed_jql = conf.board_member_jql(
+            _closed_transition_jql(start_jql, before=end_jql)
+        )
+        issues = client.search(closed_jql, ["created"], max_results=500)
+
+        lead_times = []
+        for issue in issues:
+            created_str = issue["fields"].get("created")
+            if not created_str:
+                continue
+            created = _parse_jira_dt(created_str)
+            # クローズ日はその月のどこかだが、正確な日は changelog が必要
+            # 簡易計算: 月末 - created で近似（上限は月末で切る）
+            resolved_approx = min(month_end_dt, now)
+            days = (resolved_approx - created).days
+            if days >= 0:
+                lead_times.append(days)
+
+        avg_days = sum(lead_times) / len(lead_times) if lead_times else 0
+        med_days = median(lead_times) if lead_times else 0
+
+        results.append(LeadTimeStat(
+            month_label=month_label,
+            avg_days=round(avg_days, 1),
+            median_days=round(med_days, 1),
+            count=len(lead_times),
+        ))
+
+    return results
+
+
 def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     stale = check_stale(client, conf, stale_days=7)
 
@@ -337,6 +415,16 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     ]
     unassigned = [_brief(issue) for issue in unassigned_issues]
 
+    # WIP上限チェック
+    wip_violations = [
+        WipViolation(name=stat.name, in_progress=stat.in_progress, limit=conf.wip_limit)
+        for stat in assignee_stats
+        if stat.in_progress > conf.wip_limit and stat.name != "未アサイン"
+    ]
+
+    # リードタイム計算（直近6ヶ月を月次で集計）
+    lead_time_trend = _calc_lead_time_trend(client, conf, months=6)
+
     return WeeklySummary(
         period_label=_period_label(period_start, period_end),
         stale=stale,
@@ -350,6 +438,8 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         in_progress_count=in_progress_count,
         trend_4w=trend_4w,
         assignee_stats=assignee_stats,
+        lead_time_trend=lead_time_trend,
+        wip_violations=wip_violations,
     )
 
 
@@ -573,6 +663,93 @@ def format_weekly(s: WeeklySummary) -> str:
     return "\n".join(lines)
 
 
+def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
+    """週報を Slack Block Kit 形式で生成する"""
+    from notifiers.slack import (
+        header_block, section_block, section_fields, divider_block, context_block,
+    )
+
+    today = datetime.now(tz=JST).strftime("%Y-%m-%d")
+    blocks = []
+
+    # ヘッダー
+    blocks.append(header_block(f"📊 運用保守チーム 週次レポート ({today})"))
+    blocks.append(context_block([f"対象期間: {s.period_label}"]))
+    blocks.append(divider_block())
+
+    # サマリー数値
+    delta_prefix = "+" if s.delta_count > 0 else ""
+    blocks.append(section_fields([
+        f"📥 *新規起票*\n{s.new_tickets_count}件",
+        f"✅ *完了*\n{s.closed_count}件",
+        f"📊 *増減*\n{delta_prefix}{s.delta_count}件",
+        f"🔄 *対応中*\n{s.in_progress_count}件",
+        f"⚠️ *期限超過*\n{s.overdue_count}件",
+        f"👤 *未アサイン*\n{s.unassigned_count}件",
+    ]))
+    blocks.append(divider_block())
+
+    # クローズ件数トレンド（棒グラフ風）
+    labels = ["3週前", "2週前", "先週", "今週"]
+    max_count = max(s.trend_4w) if any(s.trend_4w) else 1
+    trend_lines = []
+    for label, count in zip(labels, s.trend_4w):
+        bar = "█" * round(count / max_count * 8) if max_count > 0 else ""
+        trend_lines.append(f"`{label}` {bar} *{count}件*")
+    blocks.append(section_block("*📈 週次クローズ件数の推移*\n" + "\n".join(trend_lines)))
+    blocks.append(divider_block())
+
+    # WIP上限超過
+    if s.wip_violations:
+        wip_lines = [f"🚨 *WIP上限超過（上限: {conf.wip_limit}件）*"]
+        for v in s.wip_violations:
+            wip_lines.append(f"• *{v.name}*: {v.in_progress}件（+{v.in_progress - v.limit}超過）")
+        blocks.append(section_block("\n".join(wip_lines)))
+        blocks.append(divider_block())
+
+    # 担当者別
+    assignee_lines = ["*👥 担当者別（今週）*\n"]
+    for stat in s.assignee_stats:
+        if stat.name == "未アサイン":
+            continue
+        wip_warn = " 🚨" if stat.in_progress > conf.wip_limit else ""
+        assignee_lines.append(
+            f"• *{stat.name}*: 完了 {stat.closed_this_week}件 / 対応中 {stat.in_progress}件{wip_warn}"
+        )
+    blocks.append(section_block("\n".join(assignee_lines)))
+    blocks.append(divider_block())
+
+    # リードタイム推移
+    if s.lead_time_trend:
+        lt_lines = ["*⏱ リードタイム推移（起票→解決・月次）*\n"]
+        for lt in s.lead_time_trend:
+            lt_lines.append(f"`{lt.month_label}` 平均 *{lt.avg_days}日* / 中央値 {lt.median_days}日 ({lt.count}件)")
+        blocks.append(section_block("\n".join(lt_lines)))
+        blocks.append(divider_block())
+
+    # 停滞チケット
+    if s.stale:
+        stale_lines = [f"*🚨 滞留チケット（7日以上 IN PROGRESS）— {len(s.stale)}件*\n"]
+        for t in s.stale[:5]:
+            stale_lines.append(
+                f"• `{t.key}` {t.assignee} — {t.days_stale}日前 — {t.summary}"
+            )
+        if len(s.stale) > 5:
+            stale_lines.append(f"_…他 {len(s.stale) - 5}件_")
+        blocks.append(section_block("\n".join(stale_lines)))
+
+    # 期限超過
+    if s.overdue:
+        od_lines = [f"*⚠️ 期限超過チケット — {s.overdue_count}件*\n"]
+        for t in s.overdue:
+            od_lines.append(f"• `{t.key}` {t.assignee} {t.detail} — {t.summary}")
+        if s.overdue_count > len(s.overdue):
+            od_lines.append(f"_…他 {s.overdue_count - len(s.overdue)}件_")
+        blocks.append(section_block("\n".join(od_lines)))
+
+    return blocks
+
+
 # ---------------------------------------------------------------------------
 # エントリーポイント
 # ---------------------------------------------------------------------------
@@ -617,7 +794,8 @@ def main():
             text = format_weekly(summary)
             print(text)
             if args.notify == "slack":
-                slack_notifier.post(conf, text)
+                blocks = format_weekly_blocks(summary, conf)
+                slack_notifier.post_blocks(conf, blocks, text_fallback=text)
             elif args.notify == "confluence":
                 print("⚠️  Confluence 通知は未実装です", file=sys.stderr)
 
