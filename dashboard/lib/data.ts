@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const DATA_DIR = join(process.cwd(), "..", "data");
+const DATA_DIR = join(process.cwd(), "data");
 
 function load<T>(filename: string): T {
   try {
