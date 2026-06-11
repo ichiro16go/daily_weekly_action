@@ -73,8 +73,8 @@ python3 fetch_dashboard_data.py
 
 # ダッシュボード起動
 cd dashboard
-npm install
-npm run dev
+pnpm install
+pnpm dev
 # → http://localhost:3000 で確認
 ```
 
@@ -153,4 +153,3 @@ dashboard/
 └── .github/workflows/
     └── update-dashboard.yml  # 日次更新 CI
 ```
-
