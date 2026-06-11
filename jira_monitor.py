@@ -663,45 +663,6 @@ def format_weekly(s: WeeklySummary) -> str:
     return "\n".join(lines)
 
 
-def _build_trend_chart_url(trend_4w: list[int]) -> str:
-    """QuickChart.io で4週トレンドの棒グラフ画像 URL を生成する"""
-    import json
-    from urllib.parse import quote
-
-    chart_config = {
-        "type": "bar",
-        "data": {
-            "labels": ["3週前", "2週前", "先週", "今週"],
-            "datasets": [{
-                "label": "クローズ件数",
-                "data": list(trend_4w),
-                "backgroundColor": [
-                    "rgba(54,162,235,0.6)",
-                    "rgba(54,162,235,0.6)",
-                    "rgba(54,162,235,0.6)",
-                    "rgba(75,192,192,0.8)",
-                ],
-            }],
-        },
-        "options": {
-            "plugins": {
-                "datalabels": {
-                    "display": True,
-                    "anchor": "end",
-                    "align": "top",
-                    "font": {"weight": "bold"},
-                },
-            },
-            "scales": {
-                "y": {"beginAtZero": True, "ticks": {"stepSize": 1}},
-            },
-            "legend": {"display": False},
-        },
-    }
-    encoded = quote(json.dumps(chart_config, ensure_ascii=False))
-    return f"https://quickchart.io/chart?c={encoded}&w=500&h=250&bkg=white"
-
-
 def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
     """週報を Slack Block Kit 形式で生成する"""
     from notifiers.slack import (
@@ -728,14 +689,14 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
     ]))
     blocks.append(divider_block())
 
-    # クローズ件数トレンド（QuickChart 棒グラフ画像）
-    chart_url = _build_trend_chart_url(s.trend_4w)
-    blocks.append(section_block("*📈 週次クローズ件数の推移*"))
-    blocks.append({
-        "type": "image",
-        "image_url": chart_url,
-        "alt_text": f"週次クローズ件数: {s.trend_4w}",
-    })
+    # クローズ件数トレンド（棒グラフ風）
+    labels = ["3週前", "2週前", "先週", "今週"]
+    max_count = max(s.trend_4w) if any(s.trend_4w) else 1
+    trend_lines = []
+    for label, count in zip(labels, s.trend_4w):
+        bar = "█" * round(count / max_count * 8) if max_count > 0 else ""
+        trend_lines.append(f"`{label}` {bar} *{count}件*")
+    blocks.append(section_block("*📈 週次クローズ件数の推移*\n" + "\n".join(trend_lines)))
     blocks.append(divider_block())
 
     # WIP上限超過
