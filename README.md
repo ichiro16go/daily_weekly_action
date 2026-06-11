@@ -56,7 +56,7 @@ Jira API の `/rest/agile/1.0/board/{boardId}/issue` でチケットを取得し
 # セットアップ
 cp .env.example .env
 # .env に JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN / SLACK_WEBHOOK_URL を記入
-source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL
+source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL WEEKLY_LABELS
 
 # 日報を標準出力で確認（Slack 送信なし）
 python3 jira_monitor.py --daily
