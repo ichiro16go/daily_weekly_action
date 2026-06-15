@@ -106,6 +106,7 @@ class WeeklySummary:
     lead_time_trend: list[LeadTimeStat] = None   # 月次リードタイム推移
     wip_violations: list[WipViolation] = None    # WIP上限超過者
     kpi: KpiProgress = None                      # チームKPI進捗
+    filter_urls: dict[str, str] = None           # セクション別Jiraフィルター URL
 
 
 @dataclass
@@ -131,6 +132,16 @@ class DailyReport:
     new_tickets_count: int
     in_progress_count: int
     assignee_stats: list[AssigneeDailyStat]
+
+
+# ---------------------------------------------------------------------------
+# Jira フィルター URL ヘルパー
+# ---------------------------------------------------------------------------
+
+
+def _jira_filter_url(base_url: str, jql: str) -> str:
+    """JQL から Jira Issues 検索ページの URL を生成する"""
+    return f"{base_url}/issues/?jql={urllib.parse.quote(jql, safe='')}"
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +634,37 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     # チームKPI進捗
     kpi = _calc_kpi_progress(client, conf)
 
+    # セクション別 Jira フィルター URL
+    filter_urls = {
+        "new_tickets": _jira_filter_url(
+            conf.base_url,
+            conf.board_member_jql(_and_label(created_period_jql), order_by="created DESC"),
+        ),
+        "closed": _jira_filter_url(
+            conf.base_url,
+            conf.board_member_jql(_and_label(resolved_period_jql)),
+        ),
+        "in_progress": _jira_filter_url(
+            conf.base_url,
+            conf.board_jql(_and_label('status = "In PROGRESS"')),
+        ),
+        "overdue": _jira_filter_url(
+            conf.base_url,
+            conf.board_jql(_and_label("duedate < now()"), order_by="duedate ASC"),
+        ),
+        "unassigned": _jira_filter_url(
+            conf.base_url,
+            conf.board_jql(_and_label("assignee IS EMPTY"), order_by="created ASC"),
+        ),
+        "stale": _jira_filter_url(
+            conf.base_url,
+            conf.board_jql(
+                _and_label('status = "In PROGRESS" AND updated <= -7d'),
+                order_by="updated ASC",
+            ),
+        ),
+    }
+
     return WeeklySummary(
         period_label=_period_label(period_start, period_end),
         stale=stale,
@@ -641,6 +683,7 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         lead_time_trend=lead_time_trend,
         wip_violations=wip_violations,
         kpi=kpi,
+        filter_urls=filter_urls,
     )
 
 
@@ -888,6 +931,25 @@ def format_weekly(s: WeeklySummary) -> str:
         )
     if len(s.stale) > 5:
         lines.append(f"  …他 {len(s.stale) - 5}件")
+
+    # フィルター URL 一覧
+    if s.filter_urls:
+        lines += [
+            "",
+            "─ Jira フィルターリンク ─",
+        ]
+        url_labels = {
+            "new_tickets": "📥 新規起票",
+            "closed": "✅ 完了",
+            "in_progress": "🔄 対応中",
+            "overdue": "⚠️  期限超過",
+            "unassigned": "👤 未アサイン",
+            "stale": "🚨 滞留",
+        }
+        for key, label in url_labels.items():
+            if key in s.filter_urls:
+                lines.append(f"  {label}: {s.filter_urls[key]}")
+
     return "\n".join(lines)
 
 
@@ -929,16 +991,22 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
         blocks.append(divider_block())
 
     # サマリー数値
+    urls = s.filter_urls or {}
     delta_prefix = "+" if s.delta_count > 0 else ""
+    new_label = f"<{urls['new_tickets']}|📥 *新規起票*>" if urls.get("new_tickets") else "📥 *新規起票*"
+    closed_label = f"<{urls['closed']}|✅ *完了*>" if urls.get("closed") else "✅ *完了*"
+    ip_label = f"<{urls['in_progress']}|🔄 *対応中*>" if urls.get("in_progress") else "🔄 *対応中*"
+    od_label = f"<{urls['overdue']}|⚠️ *期限超過*>" if urls.get("overdue") else "⚠️ *期限超過*"
+    ua_label = f"<{urls['unassigned']}|👤 *未アサイン*>" if urls.get("unassigned") else "👤 *未アサイン*"
     blocks.append(
         section_fields(
             [
-                f"📥 *新規起票*\n{s.new_tickets_count}件",
-                f"✅ *完了*\n{s.closed_count}件",
+                f"{new_label}\n{s.new_tickets_count}件",
+                f"{closed_label}\n{s.closed_count}件",
                 f"📊 *増減*\n{delta_prefix}{s.delta_count}件",
-                f"🔄 *対応中*\n{s.in_progress_count}件",
-                f"⚠️ *期限超過*\n{s.overdue_count}件",
-                f"👤 *未アサイン*\n{s.unassigned_count}件",
+                f"{ip_label}\n{s.in_progress_count}件",
+                f"{od_label}\n{s.overdue_count}件",
+                f"{ua_label}\n{s.unassigned_count}件",
             ]
         )
     )
@@ -946,7 +1014,10 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
 
     # 新規起票チケット一覧
     if s.new_tickets:
-        new_lines = [f"*📥 新規起票チケット一覧 — {s.new_tickets_count}件*\n"]
+        new_header = f"*📥 新規起票チケット一覧 — {s.new_tickets_count}件*"
+        if urls.get("new_tickets"):
+            new_header += f"  <{urls['new_tickets']}|（Jiraで見る）>"
+        new_lines = [new_header + "\n"]
         for t in s.new_tickets[:10]:
             new_lines.append(f"• `{t.key}` {t.assignee} — {t.summary}")
         if s.new_tickets_count > 10:
@@ -1000,7 +1071,10 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
 
     # 停滞チケット
     if s.stale:
-        stale_lines = [f"*🚨 滞留チケット（7日以上 IN PROGRESS）— {len(s.stale)}件*\n"]
+        stale_header = f"*🚨 滞留チケット（7日以上 IN PROGRESS）— {len(s.stale)}件*"
+        if urls.get("stale"):
+            stale_header += f"  <{urls['stale']}|（Jiraで見る）>"
+        stale_lines = [stale_header + "\n"]
         for t in s.stale[:5]:
             stale_lines.append(
                 f"• `{t.key}` {t.assignee} — {t.days_stale}日前 — {t.summary}"
@@ -1011,7 +1085,10 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
 
     # 期限超過
     if s.overdue:
-        od_lines = [f"*⚠️ 期限超過チケット — {s.overdue_count}件*\n"]
+        od_header = f"*⚠️ 期限超過チケット — {s.overdue_count}件*"
+        if urls.get("overdue"):
+            od_header += f"  <{urls['overdue']}|（Jiraで見る）>"
+        od_lines = [od_header + "\n"]
         for t in s.overdue:
             od_lines.append(f"• `{t.key}` {t.assignee} {t.detail} — {t.summary}")
         if s.overdue_count > len(s.overdue):

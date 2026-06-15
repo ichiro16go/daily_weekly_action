@@ -1,0 +1,49 @@
+name: Dashboard データ更新 & デプロイ
+
+# 毎朝 9:00 JST (= 0:00 UTC) にデータを更新して Vercel に自動デプロイ
+# 手動実行も可能
+on:
+  schedule:
+    - cron: "0 0 * * *"  # 毎日 00:00 UTC = 09:00 JST
+  workflow_dispatch:
+
+jobs:
+  update-and-deploy:
+    name: データ更新 → Vercel デプロイ
+    runs-on: ubuntu-latest
+    env:
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Jira からダッシュボードデータを取得
+        run: python3 fetch_dashboard_data.py --out dashboard/data
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: dashboard
+
+      - name: Build with Vercel
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: dashboard
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: dashboard

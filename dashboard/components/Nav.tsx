@@ -4,24 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "📊 Overview" },
-  { href: "/members", label: "👥 Members" },
-  { href: "/ranking", label: "🏆 Ranking" },
+  { href: "/", label: "Overview" },
+  { href: "/members", label: "Members" },
+  { href: "/ranking", label: "Ranking" },
 ];
 
 export function Nav() {
   const pathname = usePathname();
   return (
-    <nav className="flex gap-4 border-b border-gray-200 dark:border-gray-700 px-6 py-3 bg-white dark:bg-gray-900 sticky top-0 z-10">
-      <span className="font-bold text-lg mr-4">運用保守 Dashboard</span>
+    <nav className="flex items-center gap-1 border-b border-gray-100 dark:border-gray-800 px-6 py-3 bg-white dark:bg-gray-900 sticky top-0 z-10">
+      <span className="font-semibold text-base text-gray-700 dark:text-gray-200 mr-6">運用保守 Dashboard</span>
       {NAV_ITEMS.map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className={`px-3 py-1 rounded-md text-sm transition ${
+          className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
             pathname === item.href
-              ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium"
-              : "hover:bg-gray-100 dark:hover:bg-gray-800"
+              ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:text-gray-300"
           }`}
         >
           {item.label}

@@ -136,12 +136,41 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
         label = start.strftime("%m/%d")
         weekly_closed.append({"week": label, "count": len(issues)})
 
+    # 週次リードタイム（直近12週）
+    weekly_leadtime = []
+    for start, end in week_ranges[-12:]:
+        issues = _get_closed_in_range(client, conf, start, end)
+        lead_times = []
+        for issue in issues:
+            created_str = issue["fields"].get("created")
+            resolution_str = issue["fields"].get("resolutiondate")
+            if not created_str:
+                continue
+            created = _parse_jira_dt(created_str)
+            if resolution_str:
+                resolved = _parse_jira_dt(resolution_str)
+            else:
+                resolved = end
+            days = (resolved - created).days
+            if days >= 0:
+                lead_times.append(days)
+        avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
+        med = round(median(lead_times), 1) if lead_times else 0
+        label = start.strftime("%m/%d")
+        weekly_leadtime.append({
+            "week": label,
+            "avg_days": avg,
+            "median_days": med,
+            "count": len(lead_times),
+        })
+
     # 現在の対応中数
     in_progress = _get_in_progress(client, conf)
     current_wip = len(in_progress)
 
     return {
         "monthly_leadtime": monthly_leadtime,
+        "weekly_leadtime": weekly_leadtime,
         "weekly_closed": weekly_closed,
         "current_wip": current_wip,
         "wip_limit": conf.wip_limit,
