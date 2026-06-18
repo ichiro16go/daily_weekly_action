@@ -1,0 +1,26 @@
+{
+  "cohorts": [
+    { "label": "運用保守202409", "total": 12, "closed": 7, "open": 5, "close_rate": 58.3, "continuation_rate": 41.7 },
+    { "label": "運用保守202410", "total": 14, "closed": 9, "open": 5, "close_rate": 64.3, "continuation_rate": 35.7 },
+    { "label": "運用保守202411", "total": 11, "closed": 8, "open": 3, "close_rate": 72.7, "continuation_rate": 27.3 },
+    { "label": "運用保守202412", "total": 16, "closed": 10, "open": 6, "close_rate": 62.5, "continuation_rate": 37.5 },
+    { "label": "運用保守202501", "total": 13, "closed": 8, "open": 5, "close_rate": 61.5, "continuation_rate": 38.5 },
+    { "label": "運用保守202502", "total": 10, "closed": 6, "open": 4, "close_rate": 60.0, "continuation_rate": 40.0 },
+    { "label": "運用保守202503", "total": 18, "closed": 11, "open": 7, "close_rate": 61.1, "continuation_rate": 38.9 },
+    { "label": "運用保守202504", "total": 15, "closed": 10, "open": 5, "close_rate": 66.7, "continuation_rate": 33.3 },
+    { "label": "運用保守202505", "total": 17, "closed": 12, "open": 5, "close_rate": 70.6, "continuation_rate": 29.4 },
+    { "label": "運用保守202506", "total": 14, "closed": 8, "open": 6, "close_rate": 57.1, "continuation_rate": 42.9 },
+    { "label": "運用保守202507", "total": 19, "closed": 12, "open": 7, "close_rate": 63.2, "continuation_rate": 36.8 },
+    { "label": "運用保守202508", "total": 16, "closed": 9, "open": 7, "close_rate": 56.3, "continuation_rate": 43.8 },
+    { "label": "運用保守202509", "total": 20, "closed": 14, "open": 6, "close_rate": 70.0, "continuation_rate": 30.0 },
+    { "label": "運用保守202510", "total": 18, "closed": 13, "open": 5, "close_rate": 72.2, "continuation_rate": 27.8 },
+    { "label": "運用保守202511", "total": 21, "closed": 14, "open": 7, "close_rate": 66.7, "continuation_rate": 33.3 },
+    { "label": "運用保守202512", "total": 17, "closed": 10, "open": 7, "close_rate": 58.8, "continuation_rate": 41.2 },
+    { "label": "運用保守202601", "total": 15, "closed": 9, "open": 6, "close_rate": 60.0, "continuation_rate": 40.0 },
+    { "label": "運用保守202602", "total": 13, "closed": 7, "open": 6, "close_rate": 53.8, "continuation_rate": 46.2 },
+    { "label": "運用保守202603", "total": 16, "closed": 8, "open": 8, "close_rate": 50.0, "continuation_rate": 50.0 },
+    { "label": "運用保守202604", "total": 18, "closed": 9, "open": 9, "close_rate": 50.0, "continuation_rate": 50.0 },
+    { "label": "運用保守202605", "total": 14, "closed": 6, "open": 8, "close_rate": 42.9, "continuation_rate": 57.1 },
+    { "label": "運用保守202606", "total": 12, "closed": 4, "open": 8, "close_rate": 33.3, "continuation_rate": 66.7 }
+  ]
+}

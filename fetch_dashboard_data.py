@@ -63,6 +63,23 @@ def _month_ranges(months: int = 6):
     return ranges
 
 
+def _label_cohort_labels(months: int = 18) -> list[str]:
+    """直近Nヶ月分の運用保守ラベル一覧を返す（古い順）"""
+    now = datetime.now(tz=JST)
+    labels = []
+    for offset in range(months - 1, -1, -1):
+        year = now.year
+        month = now.month - offset
+        while month <= 0:
+            month += 12
+            year -= 1
+        while month > 12:
+            month -= 12
+            year += 1
+        labels.append(f"運用保守{year}{month:02d}")
+    return labels
+
+
 def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
     """指定期間にクローズされたチケットを返す（resolved フィールドベース）"""
     jql = conf.board_member_jql(
@@ -431,6 +448,34 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     }
 
 
+def build_label_cohort_data(client: JiraClient, conf: cfg.Config) -> dict:
+    """期間ラベル別の総数・閉じ率・継続率を生成"""
+    cohorts = []
+    closed_statuses = _jql_list(CLOSE_STATUSES)
+
+    for label in _label_cohort_labels():
+        total = client.count(conf.board_member_jql(f'labels = "{label}"'))
+        if total <= 0:
+            continue
+
+        closed_jql = conf.board_member_jql(
+            f'labels = "{label}" AND (status IN ({closed_statuses}) OR resolution IS NOT EMPTY)'
+        )
+        closed = min(client.count(closed_jql), total)
+        open_count = max(total - closed, 0)
+
+        cohorts.append({
+            "label": label,
+            "total": total,
+            "closed": closed,
+            "open": open_count,
+            "close_rate": round((closed / total) * 100, 1),
+            "continuation_rate": round((open_count / total) * 100, 1),
+        })
+
+    return {"cohorts": cohorts}
+
+
 # ---------------------------------------------------------------------------
 # メイン
 # ---------------------------------------------------------------------------
@@ -481,10 +526,14 @@ def main():
     kpi = build_kpi_data(client, conf)
     _write(out_dir / "kpi.json", kpi)
 
-    meta = {"updated_at": now_str, "data_files": 7}
+    print("🏷️  期間ラベル別コホートを取得中...")
+    label_cohort = build_label_cohort_data(client, conf)
+    _write(out_dir / "label_cohort.json", label_cohort)
+
+    meta = {"updated_at": now_str, "data_files": 8}
     _write(out_dir / "meta.json", meta)
 
-    print(f"✅ 完了: {out_dir} に8ファイル出力")
+    print(f"✅ 完了: {out_dir} に9ファイル出力")
 
 
 def _write(path: Path, data):

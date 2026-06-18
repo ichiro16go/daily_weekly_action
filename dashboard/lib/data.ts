@@ -92,6 +92,17 @@ export interface KpiData {
   };
 }
 
+export interface LabelCohort {
+  cohorts: {
+    label: string;
+    total: number;
+    closed: number;
+    open: number;
+    close_rate: number;
+    continuation_rate: number;
+  }[];
+}
+
 export const getTeamSummary = () => load<TeamSummary>("team_summary.json");
 export const getMemberStats = () => load<MemberStats>("member_stats.json");
 export const getMemberLeadtime = () => load<MemberLeadtime>("member_leadtime.json");
@@ -99,4 +110,5 @@ export const getStaleRanking = () => load<StaleTicket[]>("stale_ranking.json");
 export const getOverdueRanking = () => load<OverdueTicket[]>("overdue_ranking.json");
 export const getWipStatus = () => load<WipStatus>("wip_status.json");
 export const getKpi = () => load<KpiData>("kpi.json");
+export const getLabelCohort = () => load<LabelCohort>("label_cohort.json");
 export const getMeta = () => load<Meta>("meta.json");

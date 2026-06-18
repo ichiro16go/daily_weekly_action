@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/members", label: "Members" },
   { href: "/ranking", label: "Ranking" },
+  { href: "/cohort", label: "Cohort" },
 ];
 
 export function Nav() {
