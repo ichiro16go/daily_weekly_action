@@ -61,6 +61,21 @@ export interface WipStatus {
   }[];
 }
 
+export interface CalendarData {
+  members: Record<string, {
+    tasks: {
+      key: string;
+      summary: string;
+      status: string;
+      dueDate: string | null;
+      created: string;
+      priority: string;
+      url: string;
+    }[];
+  }>;
+  generated_at: string;
+}
+
 export interface Meta {
   updated_at: string;
   data_files: number;
@@ -109,6 +124,7 @@ export const getMemberLeadtime = () => load<MemberLeadtime>("member_leadtime.jso
 export const getStaleRanking = () => load<StaleTicket[]>("stale_ranking.json");
 export const getOverdueRanking = () => load<OverdueTicket[]>("overdue_ranking.json");
 export const getWipStatus = () => load<WipStatus>("wip_status.json");
+export const getCalendarData = () => load<CalendarData>("calendar.json");
 export const getKpi = () => load<KpiData>("kpi.json");
 export const getLabelCohort = () => load<LabelCohort>("label_cohort.json");
 export const getMeta = () => load<Meta>("meta.json");

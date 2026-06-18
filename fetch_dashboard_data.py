@@ -344,6 +344,59 @@ def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
     }
 
 
+def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
+    """メンバーごとの未完了チケットをカレンダー表示用に整形"""
+    open_status_jql = f'assignee IS NOT EMPTY AND status NOT IN ({_jql_list(CLOSE_STATUSES)})'
+    issues = client.search(
+        conf.board_member_jql(open_status_jql, order_by="assignee ASC, duedate ASC, created ASC"),
+        ["summary", "assignee", "status", "duedate", "created", "updated", "priority"],
+        max_results=500,
+    )
+
+    base_url = conf.base_url.rstrip("/")
+    members: dict[str, dict[str, list[dict]]] = {}
+
+    for issue in issues:
+        name = _assignee_name(issue)
+        fields = issue["fields"]
+        created = fields.get("created")
+        if not created:
+            continue
+
+        task = {
+            "key": issue["key"],
+            "summary": fields.get("summary", ""),
+            "status": (fields.get("status") or {}).get("name", ""),
+            "dueDate": fields.get("duedate"),
+            "created": _parse_jira_dt(created).date().isoformat(),
+            "priority": ((fields.get("priority") or {}).get("name")) or "未設定",
+            "url": f"{base_url}/browse/{issue['key']}",
+        }
+
+        if name not in members:
+            members[name] = {"tasks": []}
+        members[name]["tasks"].append(task)
+
+    sorted_members = {
+        name: {
+            "tasks": sorted(
+                payload["tasks"],
+                key=lambda task: (
+                    task["dueDate"] or "9999-12-31",
+                    task["created"],
+                    task["key"],
+                ),
+            )
+        }
+        for name, payload in sorted(members.items(), key=lambda item: item[0])
+    }
+
+    return {
+        "members": sorted_members,
+        "generated_at": datetime.now(tz=JST).isoformat(),
+    }
+
+
 def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     """チームKPI進捗データを生成"""
     from jira_monitor import _resolved_jql, _KPI_TARGET_WEEKLY_CLOSED, _KPI_TARGET_LT_MEDIAN
@@ -522,6 +575,10 @@ def main():
     wip = build_wip_status(client, conf)
     _write(out_dir / "wip_status.json", wip)
 
+    print("🗓️  カレンダーデータを取得中...")
+    calendar = build_calendar_data(client, conf)
+    _write(out_dir / "calendar.json", calendar)
+
     print("🎯 KPI進捗を取得中...")
     kpi = build_kpi_data(client, conf)
     _write(out_dir / "kpi.json", kpi)
@@ -530,10 +587,10 @@ def main():
     label_cohort = build_label_cohort_data(client, conf)
     _write(out_dir / "label_cohort.json", label_cohort)
 
-    meta = {"updated_at": now_str, "data_files": 8}
+    meta = {"updated_at": now_str, "data_files": 9}
     _write(out_dir / "meta.json", meta)
 
-    print(f"✅ 完了: {out_dir} に9ファイル出力")
+    print(f"✅ 完了: {out_dir} に10ファイル出力")
 
 
 def _write(path: Path, data):
