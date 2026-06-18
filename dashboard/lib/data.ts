@@ -116,6 +116,7 @@ export interface LabelCohort {
     close_rate: number;
     continuation_rate: number;
   }[];
+  base_url?: string;
 }
 
 export const getTeamSummary = () => load<TeamSummary>("team_summary.json");

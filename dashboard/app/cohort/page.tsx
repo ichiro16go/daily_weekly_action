@@ -1,8 +1,18 @@
 import { getLabelCohort } from "@/lib/data";
 
+const CLOSE_STATUSES = ["Done", "完了", "Close", "Resolved", "解決済み", "リリース済み"];
+const DEFAULT_BASE_URL = "https://epark-tech.atlassian.net";
+
+function openIssuesUrl(baseUrl: string, label: string) {
+  const statusFilter = CLOSE_STATUSES.map((s) => `"${s}"`).join(", ");
+  const jql = `labels = "${label}" AND status NOT IN (${statusFilter}) ORDER BY updated DESC`;
+  return `${baseUrl}/issues/?jql=${encodeURIComponent(jql)}`;
+}
+
 export default function CohortPage() {
   const cohort = getLabelCohort();
   const cohorts = cohort.cohorts ?? [];
+  const baseUrl = cohort.base_url ?? DEFAULT_BASE_URL;
   const totalTickets = cohorts.reduce((sum, item) => sum + item.total, 0);
   const totalClosed = cohorts.reduce((sum, item) => sum + item.closed, 0);
   const averageCloseRate = totalTickets > 0 ? (totalClosed / totalTickets) * 100 : 0;
@@ -37,7 +47,16 @@ export default function CohortPage() {
           <tbody>
             {cohorts.map((item) => (
               <tr key={item.label} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{item.label}</td>
+                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
+                  <a
+                    href={openIssuesUrl(baseUrl, item.label)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    {item.label} ↗
+                  </a>
+                </td>
                 <td className="px-4 py-3 text-right">{item.total}</td>
                 <td className="px-4 py-3 text-right">{item.closed}</td>
                 <td className="px-4 py-3 text-right">

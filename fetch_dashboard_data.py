@@ -529,7 +529,7 @@ def build_label_cohort_data(client: JiraClient, conf: cfg.Config) -> dict:
             "continuation_rate": round((open_count / total) * 100, 1),
         })
 
-    return {"cohorts": cohorts}
+    return {"cohorts": cohorts, "base_url": conf.base_url.rstrip("/")}
 
 
 # ---------------------------------------------------------------------------
