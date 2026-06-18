@@ -346,9 +346,10 @@ def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
 
 def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
     """メンバーごとの未完了チケットをカレンダー表示用に整形"""
-    open_status_jql = f'assignee IS NOT EMPTY AND status NOT IN ({_jql_list(CLOSE_STATUSES)})'
+    # overviewの「対応中」と同じフィルタ（In Progress + ラベル）を使用
+    extra = f'status = "In Progress"{_label_filter(conf)}'
     issues = client.search(
-        conf.board_member_jql(open_status_jql, order_by="assignee ASC, duedate ASC, created ASC"),
+        conf.board_member_jql(extra, order_by="assignee ASC, duedate ASC, created ASC"),
         ["summary", "assignee", "status", "duedate", "created", "updated", "priority"],
         max_results=500,
     )
