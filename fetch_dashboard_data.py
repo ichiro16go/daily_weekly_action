@@ -358,6 +358,8 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
 
     for issue in issues:
         name = _assignee_name(issue)
+        if cfg.CALENDAR_MEMBERS and not any(name.startswith(s) for s in cfg.CALENDAR_MEMBERS):
+            continue
         fields = issue["fields"]
         created = fields.get("created")
         if not created:

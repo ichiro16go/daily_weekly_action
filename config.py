@@ -59,6 +59,9 @@ BOARD_MEMBER_BASE_JQL = (
     ' AND issuetype NOT IN (Phase, "Sub-task", サブタスク)'
 )
 
+# カレンダービューに表示するメンバー（姓の前方一致）
+CALENDAR_MEMBERS = {"石橋", "加川", "野口", "鈴鹿", "幸田"}
+
 
 @dataclass
 class Config:
