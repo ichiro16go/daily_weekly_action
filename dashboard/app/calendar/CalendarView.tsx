@@ -236,20 +236,28 @@ function layoutTasks(
 ): VisibleTask[] {
   const visible = tasks
     .map((task) => {
-      const start = maxDate(parseDate(task.created), rangeStart);
-      const end = minDate(task.dueDate ? parseDate(task.dueDate) : rangeEnd, rangeEnd);
+      const rawStart = parseDate(task.created);
+      const rawEnd = task.dueDate ? parseDate(task.dueDate) : rangeEnd;
 
-      if (end < rangeStart || start > rangeEnd || start > end) {
+      // Skip only tasks created after the visible range
+      if (rawStart > rangeEnd) {
         return null;
       }
 
+      // Clamp to visible range for positioning
+      const start = maxDate(rawStart, rangeStart);
+      const end = minDate(rawEnd, rangeEnd);
+      // Overdue or entirely before range: pin to range start
+      const clampedStart = start > end ? rangeStart : start;
+      const clampedEnd = start > end ? rangeStart : end;
+
       return {
         ...task,
-        start,
-        end,
+        start: clampedStart,
+        end: clampedEnd,
         lane: 0,
-        left: daysBetween(rangeStart, start) * DAY_COLUMN_WIDTH + 2,
-        width: Math.max((daysBetween(start, end) + 1) * DAY_COLUMN_WIDTH - 4, 28),
+        left: daysBetween(rangeStart, clampedStart) * DAY_COLUMN_WIDTH + 2,
+        width: Math.max((daysBetween(clampedStart, clampedEnd) + 1) * DAY_COLUMN_WIDTH - 4, 28),
       };
     })
     .filter((task): task is VisibleTask => task !== null)
