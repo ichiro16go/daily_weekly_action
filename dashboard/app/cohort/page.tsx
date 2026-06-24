@@ -24,6 +24,11 @@ export default function CohortPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400">
           運用保守YYYYMM ラベルごとの総件数、閉じ率、継続率を確認できます。
         </p>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 pt-1">
+          <LegendChip className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" label="閉じ率 = 完了 ÷ 総件数" />
+          <LegendChip className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300" label="継続率 = 継続中 ÷ 総件数" />
+          <span className="text-gray-400">※ ラベルをクリックで Jira の継続中チケット一覧へ</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -46,7 +51,11 @@ export default function CohortPage() {
           </thead>
           <tbody>
             {cohorts.map((item) => (
-              <tr key={item.label} className="border-t border-gray-100 dark:border-gray-800">
+              <tr
+                key={item.label}
+                className="border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
+                title={`${item.label}\n総件数: ${item.total}\n完了: ${item.closed} (${formatRate(item.close_rate)})\n継続中: ${item.open} (${formatRate(item.continuation_rate)})`}
+              >
                 <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">
                   <a
                     href={openIssuesUrl(baseUrl, item.label)}
@@ -92,6 +101,14 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-gray-400 mb-1">{label}</p>
       <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</p>
     </div>
+  );
+}
+
+function LegendChip({ label, className }: { label: string; className: string }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 ${className}`}>
+      {label}
+    </span>
   );
 }
 
