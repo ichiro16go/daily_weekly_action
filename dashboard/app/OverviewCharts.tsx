@@ -35,6 +35,20 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
           labels={weeklyLabels}
           datasets={[{ label: "クローズ", data: weeklyData, backgroundColor: "rgba(99,102,241,0.65)" }]}
         />
+        {team.weekly_close_rate && team.weekly_close_rate.length > 0 && (
+          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+            <div className="font-medium mb-1">週次 閉じ率（クローズ ÷ 起案、同一週内）</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {team.weekly_close_rate.map((r) => (
+                <span key={r.week} className="tabular-nums">
+                  {r.week}: <span className={r.rate >= 1 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400"}>{(r.rate * 100).toFixed(0)}%</span>
+                  <span className="text-gray-400"> ({r.closed}/{r.created})</span>
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-gray-400">※ 長期チケットは反映遅れあり</p>
+          </div>
+        )}
       </div>
       {weeklyCreatedLabels.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">

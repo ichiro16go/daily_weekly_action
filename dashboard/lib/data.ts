@@ -34,6 +34,7 @@ export interface TeamSummary {
   }[];
   weekly_closed: { week: string; count: number }[];
   weekly_created?: { week: string; count: number }[];
+  weekly_close_rate?: { week: string; closed: number; created: number; rate: number }[];
   current_wip: number;
   wip_limit: number;
 }
@@ -108,6 +109,7 @@ export interface KpiData {
   current: {
     total_closed: number;
     total_created?: number;
+    close_rate?: number;
     weekly_closed: number;
     weeks_elapsed: number;
     lead_time_median: number;
