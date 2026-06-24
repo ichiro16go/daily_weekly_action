@@ -113,8 +113,14 @@ GitHub リポジトリの **Settings → Secrets and variables → Actions → N
 ```bash
 cp .env.example .env
 # .env を編集して上記の値を記入
-source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL
+source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL INCLUDE_SUBTASKS
 ```
+
+### オプション環境変数
+
+| 環境変数 | 既定値 | 用途 |
+|---------|--------|------|
+| `INCLUDE_SUBTASKS` | `true` | ダッシュボード集計（起案数/クローズ数/リードタイム）にサブタスクを独立カウントするか。`false` で従来挙動。 |
 
 ---
 
