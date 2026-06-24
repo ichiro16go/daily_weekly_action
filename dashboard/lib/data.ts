@@ -17,6 +17,7 @@ export interface TeamSummary {
   monthly_leadtime: { month: string; avg_days: number; median_days: number; count: number }[];
   weekly_leadtime: { week: string; avg_days: number; median_days: number; count: number }[];
   weekly_closed: { week: string; count: number }[];
+  weekly_created?: { week: string; count: number }[];
   current_wip: number;
   wip_limit: number;
 }
@@ -90,6 +91,7 @@ export interface KpiData {
   };
   current: {
     total_closed: number;
+    total_created?: number;
     weekly_closed: number;
     weeks_elapsed: number;
     lead_time_median: number;
