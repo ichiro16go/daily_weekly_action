@@ -70,6 +70,7 @@ class Config:
     api_token: str
     slack_webhook_url: str | None
     projects: list[str] = field(default_factory=lambda: list(DEFAULT_PROJECTS))
+    excluded_projects: list[str] = field(default_factory=lambda: ["SYOUGYO"])
     wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
     weekly_labels: list[str] = field(default_factory=lambda: ["運用保守"])  # 週報で絞り込むラベル（OR）
 
@@ -77,18 +78,25 @@ class Config:
         """project in (JPREQ, EPGQC, ...) 形式の JQL 断片を返す"""
         return f"project in ({', '.join(self.projects)})"
 
+    def _excluded_projects_clause(self) -> str:
+        """除外プロジェクト用の JQL 断片を返す（先頭 AND 付き、空なら空文字）"""
+        if not self.excluded_projects:
+            return ""
+        joined = ", ".join(self.excluded_projects)
+        return f" AND project NOT IN ({joined})"
+
     def board_jql(self, extra: str = "", order_by: str = "") -> str:
         """ボードのアクティブチケット（status除外済み）に追加条件を付けて返す"""
-        jql = f"({BOARD_BASE_JQL}) AND {extra}" if extra else BOARD_BASE_JQL
+        base = f"{BOARD_BASE_JQL}{self._excluded_projects_clause()}"
+        jql = f"({base}) AND {extra}" if extra else base
         if order_by:
             jql = f"{jql} ORDER BY {order_by}"
         return jql
 
     def board_member_jql(self, extra: str = "", order_by: str = "") -> str:
         """ボードメンバー限定・statusフィルタなし（クローズ済み集計用）"""
-        jql = (
-            f"({BOARD_MEMBER_BASE_JQL}) AND {extra}" if extra else BOARD_MEMBER_BASE_JQL
-        )
+        base = f"{BOARD_MEMBER_BASE_JQL}{self._excluded_projects_clause()}"
+        jql = f"({base}) AND {extra}" if extra else base
         if order_by:
             jql = f"{jql} ORDER BY {order_by}"
         return jql
@@ -107,6 +115,9 @@ def load() -> Config:
     wip_limit = int(os.environ.get("WIP_LIMIT", "3"))
     raw_labels = os.environ.get("WEEKLY_LABELS", os.environ.get("WEEKLY_LABEL", "運用保守"))
     weekly_labels = [l.strip() for l in raw_labels.split(",") if l.strip()]
+
+    raw_excluded = os.environ.get("EXCLUDED_PROJECTS", "SYOUGYO")
+    excluded_projects = [p.strip() for p in raw_excluded.split(",") if p.strip()]
 
     missing = [
         k
@@ -127,6 +138,7 @@ def load() -> Config:
         api_token=api_token,
         slack_webhook_url=slack_webhook_url,
         projects=projects,
+        excluded_projects=excluded_projects,
         wip_limit=wip_limit,
         weekly_labels=weekly_labels,
     )
