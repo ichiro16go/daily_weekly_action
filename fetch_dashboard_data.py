@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config as cfg
 from jira_monitor import (
     JiraClient, JST, CLOSE_STATUSES, check_stale, _parse_jira_dt, _jql_datetime,
-    _resolved_jql, _jql_list,
+    _resolved_jql, _jql_list, expand_weekly_labels,
 )
 
 # ---------------------------------------------------------------------------
@@ -131,8 +131,26 @@ def _month_ranges(months: int = 6):
     return ranges
 
 
-def _label_cohort_labels(months: int = 18) -> list[str]:
-    """直近Nヶ月分の運用保守ラベル一覧を返す（古い順）"""
+def _label_cohort_labels(conf: "cfg.Config | None" = None, months: int = 18) -> list[str]:
+    """期間別コホート対象のラベル一覧（古い順）を返す。
+
+    conf.weekly_label_pattern にマッチするラベル（`expand_weekly_labels` で
+    展開された実在ラベル）を優先して使う。空または該当なしの場合は
+    フォールバックで「今日から過去 months ヶ月分」を機械生成する
+    （後方互換のため）。
+    """
+    import re as _re
+
+    if conf is not None and getattr(conf, "weekly_label_pattern", None):
+        try:
+            regex = _re.compile(conf.weekly_label_pattern)
+            matched = sorted({l for l in conf.weekly_labels if regex.match(l)})
+            if matched:
+                return matched
+        except _re.error:
+            pass
+
+    # フォールバック: 現在月から遡って機械生成
     now = datetime.now(tz=JST)
     labels = []
     for offset in range(months - 1, -1, -1):
@@ -157,10 +175,15 @@ def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
 
 
 def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
-    """指定期間に起案（created）されたチケット件数を返す。"""
+    """指定期間に起案（created）されたチケット件数を返す。
+
+    NOTE: `_jql_datetime` はすでにダブルクォート込みの文字列を返すため、
+    f-string 内で追加で `"` を付けてはならない（過去にこれが原因で常に 0 件
+    返るバグがあった。週報側 jira_monitor.build_weekly_summary の実装に揃える）。
+    """
     start_jql = _jql_datetime(start)
     end_jql = _jql_datetime(end)
-    extra = f'created >= "{start_jql}" AND created < "{end_jql}"{_label_filter(conf)}'
+    extra = f'created >= {start_jql} AND created < {end_jql}{_label_filter(conf)}'
     jql = conf.board_member_jql(extra)
     return client.count(jql)
 
@@ -242,7 +265,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "raw_count": len(lead_times),
         })
 
-    # 週次クローズ・対応中数
+    # 週次クローズ・対応中数（同じループで起案数と閉じ率も集計）
     weekly_closed = []
     weekly_created = []
     weekly_close_rate = []
@@ -260,13 +283,6 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "created": created_count,
             "rate": _safe_rate(closed_count, created_count),
         })
-
-    # 週次起案数（EPGPRD-309）— 直近8週
-    weekly_created = []
-    for start, end in week_ranges[-8:]:
-        count = _get_created_in_range(client, conf, start, end)
-        label = start.strftime("%m/%d")
-        weekly_created.append({"week": label, "count": count})
 
     # 週次リードタイム（直近12週）
     weekly_leadtime = []
@@ -678,7 +694,7 @@ def build_label_cohort_data(client: JiraClient, conf: cfg.Config) -> dict:
     cohorts = []
     closed_statuses = _jql_list(CLOSE_STATUSES)
 
-    for label in _label_cohort_labels():
+    for label in _label_cohort_labels(conf):
         total = client.count(conf.board_member_jql(f'labels = "{label}"'))
         if total <= 0:
             continue
@@ -721,6 +737,9 @@ def main():
         sys.exit(1)
 
     client = JiraClient(conf)
+    added_labels = expand_weekly_labels(client, conf)
+    if added_labels:
+        print(f"🏷️  ラベル自動展開: +{len(added_labels)} 件 ({', '.join(added_labels[:5])}{'...' if len(added_labels) > 5 else ''})", file=sys.stderr)
     now_str = datetime.now(tz=JST).isoformat()
 
     print("📊 チームサマリーを取得中...")

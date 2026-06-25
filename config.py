@@ -73,6 +73,10 @@ class Config:
     excluded_projects: list[str] = field(default_factory=lambda: ["SYOUGYO"])
     wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
     weekly_labels: list[str] = field(default_factory=lambda: ["運用保守"])  # 週報で絞り込むラベル（OR）
+    # 起動時に Jira から取得したラベルのうち、この正規表現にマッチするものを weekly_labels に追加する。
+    # 既定: 「運用保守」+ 6桁数字（運用保守202401 など）の月次タグを全部拾う。
+    # 空文字なら自動展開を行わない。
+    weekly_label_pattern: str | None = r"^運用保守\d{6}$"
     include_subtasks: bool = True  # サブタスクを集計に含めるか（既定: true）
     # Jira の Start Date カスタムフィールド ID (例: customfield_10015)。空ならフォールバック動作。
     start_date_field: str = "customfield_10015"
@@ -133,6 +137,13 @@ def load() -> Config:
 
     start_date_field = os.environ.get("JIRA_START_DATE_FIELD", "customfield_10015").strip()
 
+    # ラベル自動展開パターン（環境変数で上書き可、空文字なら無効化）
+    label_pattern_env = os.environ.get("WEEKLY_LABEL_PATTERN")
+    if label_pattern_env is None:
+        weekly_label_pattern: str | None = r"^運用保守\d{6}$"
+    else:
+        weekly_label_pattern = label_pattern_env.strip() or None
+
     missing = [
         k
         for k, v in [
@@ -155,6 +166,7 @@ def load() -> Config:
         excluded_projects=excluded_projects,
         wip_limit=wip_limit,
         weekly_labels=weekly_labels,
+        weekly_label_pattern=weekly_label_pattern,
         include_subtasks=include_subtasks,
         start_date_field=start_date_field,
     )

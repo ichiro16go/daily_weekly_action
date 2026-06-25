@@ -8,10 +8,21 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
   const [ltView, setLtView] = useState<"weekly" | "monthly">("weekly");
 
   const weeklyLabels = team.weekly_closed?.map((w) => w.week) ?? [];
-  const weeklyData = team.weekly_closed?.map((w) => w.count) ?? [];
+  const weeklyClosedData = team.weekly_closed?.map((w) => w.count) ?? [];
 
-  const weeklyCreatedLabels = team.weekly_created?.map((w) => w.week) ?? [];
-  const weeklyCreatedData = team.weekly_created?.map((w) => w.count) ?? [];
+  // 起案数を週次クローズと同じ週ラベルで揃える（zip by week label）
+  const createdByWeek = new Map(
+    (team.weekly_created ?? []).map((w) => [w.week, w.count]),
+  );
+  const weeklyCreatedData = weeklyLabels.map((w) => createdByWeek.get(w) ?? 0);
+  // 閉じ率（クローズ ÷ 起案）を % で。起案 0 の週は null（線が切れる）
+  const rateByWeek = new Map(
+    (team.weekly_close_rate ?? []).map((r) => [r.week, r.rate]),
+  );
+  const weeklyCloseRatePct = weeklyLabels.map((w) => {
+    const r = rateByWeek.get(w);
+    return r === undefined || r === null ? null : Math.round(r * 100);
+  });
 
   const ltMonthlyLabels = team.monthly_leadtime?.map((m) => m.month) ?? [];
   const ltMonthlyAvg = team.monthly_leadtime?.map((m) => m.avg_days) ?? [];
@@ -31,34 +42,16 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <BarChart
-          title="週次クローズ件数"
+          title="週次クローズ件数 vs 起案件数（折れ線=起案 / 閉じ率%）"
           labels={weeklyLabels}
-          datasets={[{ label: "クローズ", data: weeklyData, backgroundColor: "rgba(99,102,241,0.65)" }]}
+          datasets={[{ label: "クローズ", data: weeklyClosedData, backgroundColor: "rgba(99,102,241,0.65)" }]}
+          lineDatasets={[
+            { label: "起案", data: weeklyCreatedData, borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.15)" },
+            { label: "閉じ率 (%)", data: weeklyCloseRatePct as number[], borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.15)", yAxisID: "y1" },
+          ]}
         />
-        {team.weekly_close_rate && team.weekly_close_rate.length > 0 && (
-          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            <div className="font-medium mb-1">週次 閉じ率（クローズ ÷ 起案、同一週内）</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {team.weekly_close_rate.map((r) => (
-                <span key={r.week} className="tabular-nums">
-                  {r.week}: <span className={r.rate >= 1 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400"}>{(r.rate * 100).toFixed(0)}%</span>
-                  <span className="text-gray-400"> ({r.closed}/{r.created})</span>
-                </span>
-              ))}
-            </div>
-            <p className="mt-1 text-[10px] text-gray-400">※ 長期チケットは反映遅れあり</p>
-          </div>
-        )}
+        <p className="mt-2 text-[10px] text-gray-400">※ 閉じ率 = 同一週内クローズ ÷ 起案。100% を超える週は前週以前の積み上がりを消化したことを示す。長期チケットは反映遅れあり。</p>
       </div>
-      {weeklyCreatedLabels.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
-          <BarChart
-            title="週次起案件数"
-            labels={weeklyCreatedLabels}
-            datasets={[{ label: "起案", data: weeklyCreatedData, backgroundColor: "rgba(16,185,129,0.65)" }]}
-          />
-        </div>
-      )}
       <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">リードタイム推移</h3>
