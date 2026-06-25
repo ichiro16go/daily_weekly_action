@@ -68,6 +68,16 @@ export interface OverdueTicket {
   url: string;
 }
 
+export interface NeglectedTicket {
+  key: string;
+  summary: string;
+  assignee: string;
+  status: string;
+  created: string;
+  days_since_created: number;
+  url: string;
+}
+
 export interface WipStatus {
   wip_limit: number;
   total_wip: number;
@@ -86,6 +96,7 @@ export interface CalendarData {
       summary: string;
       status: string;
       dueDate: string | null;
+      endDateSource?: "wbsgantt" | "duedate" | null;
       startDate: string | null;
       created: string;
       priority: string;
@@ -145,6 +156,7 @@ export const getMemberStats = () => load<MemberStats>("member_stats.json");
 export const getMemberLeadtime = () => load<MemberLeadtime>("member_leadtime.json");
 export const getStaleRanking = () => load<StaleTicket[]>("stale_ranking.json");
 export const getOverdueRanking = () => load<OverdueTicket[]>("overdue_ranking.json");
+export const getNeglectedRanking = () => load<NeglectedTicket[]>("neglected_ranking.json");
 export const getWipStatus = () => load<WipStatus>("wip_status.json");
 export const getCalendarData = () => load<CalendarData>("calendar.json");
 export const getKpi = () => load<KpiData>("kpi.json");

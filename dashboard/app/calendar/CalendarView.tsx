@@ -95,9 +95,12 @@ export function CalendarView({ data }: { data: CalendarData }) {
                         className="bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500"
                     />
                     <Legend
-                        label="開始/期限 未設定"
+                        label="開始/終了日 未設定"
                         className="bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-600 border-dashed"
                     />
+                    <span>
+                        終了日は 終了日(WBSGantt) を参照（未設定時は期限を使用）
+                    </span>
                 </div>
             </div>
 
@@ -228,7 +231,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                             dueOutsideRange &&
                                             task.dueDate;
                                         const labelText = showOverdueDateInLabel
-                                            ? `${task.key} · ${task.summary}（期限 ${formatMonthDay(parseDate(task.dueDate!))}）`
+                                            ? `${task.key} · ${task.summary}（終了日 ${formatMonthDay(parseDate(task.dueDate!))}）`
                                             : `${task.key} · ${task.summary}`;
                                         return (
                                             <a
@@ -350,7 +353,7 @@ function layoutTasks(
             const hasDueDate = !!task.dueDate;
             // 開始日: Jira Start Date 優先、無ければ created にフォールバック
             const rawStart = parseDate(task.startDate ?? task.created);
-            // 終了日: Jira Due Date 優先、無ければ「今日」（進行中継続を示唆）にフォールバック
+            // 終了日: WBSGantt 終了日優先、無ければ「今日」（進行中継続を示唆）にフォールバック
             const rawEnd = task.dueDate ? parseDate(task.dueDate) : today;
 
             // 全くレンジ外（未来開始、または過去終了でクランプ不要）
@@ -413,7 +416,7 @@ function layoutTasks(
 }
 
 function getTaskClassName(task: VisibleTask, today: Date) {
-    // 開始・期限ともに未設定 → 視認性のため薄い amber + 点線枠で表現
+    // 開始・終了日ともに未設定 → 視認性のため薄い amber + 点線枠で表現
     if (!task.hasStartDate && !task.hasDueDate) {
         return "bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600 border-dashed text-amber-800 dark:text-amber-200";
     }
