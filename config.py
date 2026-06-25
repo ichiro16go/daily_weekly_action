@@ -41,7 +41,7 @@ BOARD_BASE_JQL = (
     ') OR (assignee IS EMPTY AND project IN ("グルメ作業依頼", JPREQ)))'
     " AND status NOT IN (Done, 完了, レビュー完了, Close, Rejected, Resolved,"
     " 取り下げ, レビュー済み, 切り戻し, 却下, 解決済み, リリース済み, ペンディング)"
-    ' AND issuetype NOT IN (Phase, "Sub-task", サブタスク)'
+    ' AND issuetype NOT IN (Phase)'
 )
 
 # statusフィルタなし版（クローズ済みチケットの集計に使用）
@@ -56,7 +56,7 @@ BOARD_MEMBER_BASE_JQL = (
     "712020:d75d4ac0-7f94-46dd-b6e4-14a152e4c590,"
     "712020:fc35c9f8-e13f-4f89-8fd3-a11ac4b13d86"
     ') OR (assignee IS EMPTY AND project IN ("グルメ作業依頼", JPREQ)))'
-    ' AND issuetype NOT IN (Phase, "Sub-task", サブタスク)'
+    ' AND issuetype NOT IN (Phase)'
 )
 
 # カレンダービューに表示するメンバー（姓の前方一致）
@@ -73,6 +73,7 @@ class Config:
     excluded_projects: list[str] = field(default_factory=lambda: ["SYOUGYO"])
     wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
     weekly_labels: list[str] = field(default_factory=lambda: ["運用保守"])  # 週報で絞り込むラベル（OR）
+    include_subtasks: bool = True  # サブタスクを集計に含めるか（既定: true）
 
     def projects_jql(self) -> str:
         """project in (JPREQ, EPGQC, ...) 形式の JQL 断片を返す"""
@@ -85,9 +86,15 @@ class Config:
         joined = ", ".join(self.excluded_projects)
         return f" AND project NOT IN ({joined})"
 
+    def _subtask_clause(self) -> str:
+        """include_subtasks=False のとき Sub-task/サブタスクを追加除外する断片"""
+        if self.include_subtasks:
+            return ""
+        return ' AND issuetype NOT IN ("Sub-task", サブタスク)'
+
     def board_jql(self, extra: str = "", order_by: str = "") -> str:
         """ボードのアクティブチケット（status除外済み）に追加条件を付けて返す"""
-        base = f"{BOARD_BASE_JQL}{self._excluded_projects_clause()}"
+        base = f"{BOARD_BASE_JQL}{self._excluded_projects_clause()}{self._subtask_clause()}"
         jql = f"({base}) AND {extra}" if extra else base
         if order_by:
             jql = f"{jql} ORDER BY {order_by}"
@@ -95,7 +102,7 @@ class Config:
 
     def board_member_jql(self, extra: str = "", order_by: str = "") -> str:
         """ボードメンバー限定・statusフィルタなし（クローズ済み集計用）"""
-        base = f"{BOARD_MEMBER_BASE_JQL}{self._excluded_projects_clause()}"
+        base = f"{BOARD_MEMBER_BASE_JQL}{self._excluded_projects_clause()}{self._subtask_clause()}"
         jql = f"({base}) AND {extra}" if extra else base
         if order_by:
             jql = f"{jql} ORDER BY {order_by}"
@@ -119,6 +126,9 @@ def load() -> Config:
     raw_excluded = os.environ.get("EXCLUDED_PROJECTS", "SYOUGYO")
     excluded_projects = [p.strip() for p in raw_excluded.split(",") if p.strip()]
 
+    include_subtasks_raw = os.environ.get("INCLUDE_SUBTASKS", "true").strip().lower()
+    include_subtasks = include_subtasks_raw not in ("false", "0", "no", "off")
+
     missing = [
         k
         for k, v in [
@@ -141,4 +151,5 @@ def load() -> Config:
         excluded_projects=excluded_projects,
         wip_limit=wip_limit,
         weekly_labels=weekly_labels,
+        include_subtasks=include_subtasks,
     )
