@@ -113,6 +113,15 @@ def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
     return client.search(jql, ["summary", "assignee", "created", "resolutiondate", "issuetype"], max_results=500)
 
 
+def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
+    """指定期間に起案（created）されたチケット件数を返す。EPGPRD-309."""
+    start_jql = _jql_datetime(start)
+    end_jql = _jql_datetime(end)
+    extra = f'created >= "{start_jql}" AND created < "{end_jql}"{_label_filter(conf)}'
+    jql = conf.board_member_jql(extra)
+    return client.count(jql)
+
+
 def _get_in_progress(client: JiraClient, conf: cfg.Config):
     """現在IN PROGRESSのチケットを返す（ラベルフィルタ適用）"""
     extra = f'status = "In Progress"{_label_filter(conf)}'
@@ -184,6 +193,13 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
         label = start.strftime("%m/%d")
         weekly_closed.append({"week": label, "count": len(issues)})
 
+    # 週次起案数（EPGPRD-309）— 直近8週
+    weekly_created = []
+    for start, end in week_ranges[-8:]:
+        count = _get_created_in_range(client, conf, start, end)
+        label = start.strftime("%m/%d")
+        weekly_created.append({"week": label, "count": count})
+
     # 週次リードタイム（直近12週）
     weekly_leadtime = []
     for start, end in week_ranges[-12:]:
@@ -226,6 +242,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
         "monthly_leadtime": monthly_leadtime,
         "weekly_leadtime": weekly_leadtime,
         "weekly_closed": weekly_closed,
+        "weekly_created": weekly_created,
         "current_wip": current_wip,
         "wip_limit": conf.wip_limit,
     }
@@ -488,7 +505,10 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     )
     half_total = len(current_issues)
 
-    # リードタイム計算（EPGPRD-314: 半期内に created されたチケットのみ）
+    # 今半期の起案数（EPGPRD-309）
+    half_created_total = _get_created_in_range(client, conf, half_start, now)
+
+    # リードタイム計算
     lead_times = []
     excluded_old = 0
     for issue in current_issues:
@@ -533,6 +553,7 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
         },
         "current": {
             "total_closed": half_total,
+            "total_created": half_created_total,
             "weekly_closed": actual_weekly,
             "weeks_elapsed": weeks_elapsed,
             "lead_time_median": lt_median,
