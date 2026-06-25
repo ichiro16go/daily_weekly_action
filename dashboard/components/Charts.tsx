@@ -50,6 +50,7 @@ interface BarChartProps {
 
 export function BarChart({ labels, datasets, title, lineDatasets }: BarChartProps) {
   if (lineDatasets && lineDatasets.length > 0) {
+    const hasSecondaryAxis = lineDatasets.some((d) => d.yAxisID === "y1");
     const data = {
       labels,
       datasets: [
@@ -88,6 +89,20 @@ export function BarChart({ labels, datasets, title, lineDatasets }: BarChartProp
           },
           scales: {
             y: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 } } },
+            ...(hasSecondaryAxis
+              ? {
+                  y1: {
+                    beginAtZero: true,
+                    position: "right" as const,
+                    grid: { display: false },
+                    ticks: {
+                      font: { size: 11 },
+                      callback: (v: number | string) => `${v}%`,
+                    },
+                    title: { display: true, text: "閉じ率", font: { size: 10 }, color: "#6b7280" },
+                  },
+                }
+              : {}),
             x: { grid: { display: false }, ticks: { font: { size: 11 } } },
           },
         }}

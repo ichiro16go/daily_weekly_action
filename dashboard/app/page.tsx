@@ -107,13 +107,13 @@ export default function OverviewPage() {
         {(() => {
           const closed = team.weekly_closed?.at(-1)?.count ?? 0;
           const created = team.weekly_created?.at(-1)?.count ?? 0;
-          const diff = closed - created;
-          const diffLabel = diff > 0 ? `+${diff}` : `${diff}`;
+          const rate = created > 0 ? closed / created : null;
+          const label = rate === null ? "—" : `${Math.round(rate * 100)}%`;
           return (
             <MetricCard
-              label="今週 差分 (クローズ−起案)"
-              value={diffLabel}
-              alert={diff < 0}
+              label="今週 閉じ率"
+              value={label}
+              alert={rate !== null && rate < 1}
             />
           );
         })()}
