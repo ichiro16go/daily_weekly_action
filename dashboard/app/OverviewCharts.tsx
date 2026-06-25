@@ -8,10 +8,15 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
   const [ltView, setLtView] = useState<"weekly" | "monthly">("weekly");
 
   const weeklyLabels = team.weekly_closed?.map((w) => w.week) ?? [];
-  const weeklyData = team.weekly_closed?.map((w) => w.count) ?? [];
+  const weeklyClosedData = team.weekly_closed?.map((w) => w.count) ?? [];
 
-  const weeklyCreatedLabels = team.weekly_created?.map((w) => w.week) ?? [];
-  const weeklyCreatedData = team.weekly_created?.map((w) => w.count) ?? [];
+  // 起案数を週次クローズと同じ週ラベルで揃える（zip by week label）
+  const createdByWeek = new Map(
+    (team.weekly_created ?? []).map((w) => [w.week, w.count]),
+  );
+  const weeklyCreatedData = weeklyLabels.map((w) => createdByWeek.get(w) ?? 0);
+  // 差分 (クローズ - 起案): プラス=消化が起案を上回る, マイナス=積み上がり
+  const weeklyDiffData = weeklyClosedData.map((c, i) => c - (weeklyCreatedData[i] ?? 0));
 
   const ltMonthlyLabels = team.monthly_leadtime?.map((m) => m.month) ?? [];
   const ltMonthlyAvg = team.monthly_leadtime?.map((m) => m.avg_days) ?? [];
@@ -31,9 +36,13 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <BarChart
-          title="週次クローズ件数"
+          title="週次クローズ件数 vs 起案件数（折れ線=起案 / 差分）"
           labels={weeklyLabels}
-          datasets={[{ label: "クローズ", data: weeklyData, backgroundColor: "rgba(99,102,241,0.65)" }]}
+          datasets={[{ label: "クローズ", data: weeklyClosedData, backgroundColor: "rgba(99,102,241,0.65)" }]}
+          lineDatasets={[
+            { label: "起案", data: weeklyCreatedData, borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.15)" },
+            { label: "差分 (クローズ-起案)", data: weeklyDiffData, borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.15)" },
+          ]}
         />
         {team.weekly_close_rate && team.weekly_close_rate.length > 0 && (
           <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
@@ -50,15 +59,6 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
           </div>
         )}
       </div>
-      {weeklyCreatedLabels.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
-          <BarChart
-            title="週次起案件数"
-            labels={weeklyCreatedLabels}
-            datasets={[{ label: "起案", data: weeklyCreatedData, backgroundColor: "rgba(16,185,129,0.65)" }]}
-          />
-        </div>
-      )}
       <div className="bg-white dark:bg-gray-900 rounded-xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">リードタイム推移</h3>

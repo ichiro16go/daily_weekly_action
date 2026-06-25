@@ -99,10 +99,24 @@ export default function OverviewPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MetricCard label="対応中 (WIP)" value={team.current_wip ?? 0} alert={(team.current_wip ?? 0) > (team.wip_limit ?? 3) * 7} />
         <MetricCard label="WIP上限/人" value={team.wip_limit ?? 3} />
         <MetricCard label="今週クローズ" value={team.weekly_closed?.at(-1)?.count ?? 0} />
+        <MetricCard label="今週 新規起票" value={team.weekly_created?.at(-1)?.count ?? 0} />
+        {(() => {
+          const closed = team.weekly_closed?.at(-1)?.count ?? 0;
+          const created = team.weekly_created?.at(-1)?.count ?? 0;
+          const diff = closed - created;
+          const diffLabel = diff > 0 ? `+${diff}` : `${diff}`;
+          return (
+            <MetricCard
+              label="今週 差分 (クローズ−起案)"
+              value={diffLabel}
+              alert={diff < 0}
+            />
+          );
+        })()}
         <MetricCard label="リードタイム(中央値)" value={`${team.monthly_leadtime?.at(-1)?.median_days ?? "-"}日`} />
       </div>
 

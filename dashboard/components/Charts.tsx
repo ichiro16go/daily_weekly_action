@@ -12,7 +12,7 @@ import {
   Legend,
   Filler,
 } from "chart.js";
-import { Bar, Line } from "react-chartjs-2";
+import { Bar, Chart, Line } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale,
@@ -26,13 +26,74 @@ ChartJS.register(
   Filler
 );
 
-interface BarChartProps {
-  labels: string[];
-  datasets: { label: string; data: number[]; backgroundColor?: string }[];
-  title?: string;
+interface BarDataset {
+  label: string;
+  data: number[];
+  backgroundColor?: string;
 }
 
-export function BarChart({ labels, datasets, title }: BarChartProps) {
+interface LineOverlayDataset {
+  label: string;
+  data: number[];
+  borderColor?: string;
+  backgroundColor?: string;
+  yAxisID?: string;
+}
+
+interface BarChartProps {
+  labels: string[];
+  datasets: BarDataset[];
+  title?: string;
+  /** Optional line datasets overlaid on the same chart (combo bar+line). */
+  lineDatasets?: LineOverlayDataset[];
+}
+
+export function BarChart({ labels, datasets, title, lineDatasets }: BarChartProps) {
+  if (lineDatasets && lineDatasets.length > 0) {
+    const data = {
+      labels,
+      datasets: [
+        ...datasets.map((d) => ({
+          type: "bar" as const,
+          label: d.label,
+          data: d.data,
+          backgroundColor: d.backgroundColor,
+          order: 2,
+        })),
+        ...lineDatasets.map((d) => ({
+          type: "line" as const,
+          label: d.label,
+          data: d.data,
+          borderColor: d.borderColor,
+          backgroundColor: d.backgroundColor,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: false,
+          order: 1,
+          yAxisID: d.yAxisID,
+        })),
+      ],
+    };
+    return (
+      <Chart
+        type="bar"
+        data={data}
+        options={{
+          responsive: true,
+          plugins: {
+            title: { display: !!title, text: title, font: { size: 13, weight: "normal" }, color: "#6b7280" },
+            legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 } } },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          },
+        }}
+      />
+    );
+  }
   return (
     <Bar
       data={{ labels, datasets }}
