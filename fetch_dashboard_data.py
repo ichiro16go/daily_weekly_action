@@ -131,8 +131,26 @@ def _month_ranges(months: int = 6):
     return ranges
 
 
-def _label_cohort_labels(months: int = 18) -> list[str]:
-    """直近Nヶ月分の運用保守ラベル一覧を返す（古い順）"""
+def _label_cohort_labels(conf: "cfg.Config | None" = None, months: int = 18) -> list[str]:
+    """期間別コホート対象のラベル一覧（古い順）を返す。
+
+    conf.weekly_label_pattern にマッチするラベル（`expand_weekly_labels` で
+    展開された実在ラベル）を優先して使う。空または該当なしの場合は
+    フォールバックで「今日から過去 months ヶ月分」を機械生成する
+    （後方互換のため）。
+    """
+    import re as _re
+
+    if conf is not None and getattr(conf, "weekly_label_pattern", None):
+        try:
+            regex = _re.compile(conf.weekly_label_pattern)
+            matched = sorted({l for l in conf.weekly_labels if regex.match(l)})
+            if matched:
+                return matched
+        except _re.error:
+            pass
+
+    # フォールバック: 現在月から遡って機械生成
     now = datetime.now(tz=JST)
     labels = []
     for offset in range(months - 1, -1, -1):
@@ -676,7 +694,7 @@ def build_label_cohort_data(client: JiraClient, conf: cfg.Config) -> dict:
     cohorts = []
     closed_statuses = _jql_list(CLOSE_STATUSES)
 
-    for label in _label_cohort_labels():
+    for label in _label_cohort_labels(conf):
         total = client.count(conf.board_member_jql(f'labels = "{label}"'))
         if total <= 0:
             continue
