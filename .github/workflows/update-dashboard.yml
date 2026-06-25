@@ -2,6 +2,14 @@ name: Dashboard データ更新 & デプロイ
 
 # 毎朝 9:00 JST (= 0:00 UTC) にデータを更新して Vercel に自動デプロイ
 # 手動実行も可能
+#
+# Vercel Password Protection 有効後も、preview / production の SSG ビルド自体には
+# 影響しない（Vercel 側で配信時に認証チェックが入るのみ）。
+# GitHub Actions から認証付き preview URL などを fetch する必要が出た場合は、
+# Vercel で VERCEL_AUTOMATION_BYPASS_SECRET を Generate し、
+# GitHub Repository Secrets に同名で保存してから、HTTP リクエスト時に
+# `x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}`
+# ヘッダーとして渡す。
 on:
   schedule:
     - cron: "0 0 * * *"  # 毎日 00:00 UTC = 09:00 JST

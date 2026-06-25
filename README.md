@@ -125,6 +125,14 @@ source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL 
 |---------|--------|------|
 | `INCLUDE_SUBTASKS` | `true` | ダッシュボード集計（起案数/クローズ数/リードタイム）にサブタスクを独立カウントするか。`false` で従来挙動。 |
 
+## アクセス制限（ダッシュボード）
+
+本番ダッシュボードは [Vercel Password Protection](https://vercel.com/docs/security/deployment-protection) を使い、チーム共通パスワードで保護します。実際の有効化は Vercel Dashboard の Project Settings → Deployment Protection で手動実施します。
+
+- パスワード共有方法: TODO: 共有方法をチームで決定（例: 運用保守チームの ⚙ 共有ストレージ / 1Password / 部内Slack DM 担当者）
+- 認証フローのスクリーンショット位置: `docs/images/vercel-password-protection-flow.png`（未添付。取得後に配置）
+- 手動設定チェックリスト: `docs/vercel-password-protection.md`
+
 ---
 
 ## ファイル構成

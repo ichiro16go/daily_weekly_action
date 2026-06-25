@@ -76,7 +76,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                     </span>
                     <Legend
                         label="進行中"
-                        className="bg-indigo-200 dark:bg-indigo-800 border-indigo-400 dark:border-indigo-600"
+                        className="bg-indigo-200 dark:bg-green-800 border-green-400 dark:border-green-600"
                     />
                     <Legend
                         label="未着手/対応待ち"
@@ -197,9 +197,10 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                             !!task.dueDate &&
                                             (task.rawEnd < range.start ||
                                                 task.rawEnd > range.end);
-                                        const startSourceLabel = task.hasStartDate
-                                            ? `開始: ${task.startDate}`
-                                            : `開始: 未設定 (起案 ${task.created})`;
+                                        const startSourceLabel =
+                                            task.hasStartDate
+                                                ? `開始: ${task.startDate}`
+                                                : `開始: 未設定 (起案 ${task.created})`;
                                         const endSourceLabel = task.hasDueDate
                                             ? `期限: ${task.dueDate}`
                                             : `期限: 未設定`;
@@ -215,7 +216,8 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                             dueOutsideRange && task.dueDate
                                                 ? `(表示月外: ${formatMonthDay(parseDate(task.dueDate))})`
                                                 : null,
-                                            !task.hasStartDate && !task.hasDueDate
+                                            !task.hasStartDate &&
+                                            !task.hasDueDate
                                                 ? "※ 開始日・終了日が未設定のためバー位置は概算です"
                                                 : null,
                                         ]
@@ -244,7 +246,8 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                                     top:
                                                         8 +
                                                         task.lane *
-                                                            (BAR_HEIGHT + BAR_GAP),
+                                                            (BAR_HEIGHT +
+                                                                BAR_GAP),
                                                     width: task.width,
                                                     height: BAR_HEIGHT,
                                                 }}
@@ -428,7 +431,7 @@ function getTaskClassName(task: VisibleTask, today: Date) {
         }
     }
     if (task.status.toLowerCase().includes("progress")) {
-        return "bg-indigo-200 dark:bg-indigo-800 border-indigo-400 dark:border-indigo-600";
+        return "bg-green-200 dark:bg-green-800 border-green-400 dark:border-green-600";
     }
     return "bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600";
 }

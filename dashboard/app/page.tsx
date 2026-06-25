@@ -83,9 +83,6 @@ export default function OverviewPage() {
             <div>
               <p className="text-xs text-gray-400 mb-1">上半期累計</p>
               <p className="text-xl font-bold text-gray-800 dark:text-gray-100">{kpi.current.total_closed}件</p>
-              {kpi.current.total_closed_subtasks !== undefined && (
-                <p className="text-xs text-gray-400">（うちサブタスク {kpi.current.total_closed_subtasks}件）</p>
-              )}
               <p className="text-xs text-gray-400">{kpi.current.weeks_elapsed}週経過</p>
             </div>
             <div>
@@ -105,16 +102,8 @@ export default function OverviewPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MetricCard label="対応中 (WIP)" value={team.current_wip ?? 0} alert={(team.current_wip ?? 0) > (team.wip_limit ?? 3) * 7} />
         <MetricCard label="WIP上限/人" value={team.wip_limit ?? 3} />
-        <MetricCard
-          label="今週クローズ"
-          value={team.weekly_closed?.at(-1)?.count ?? 0}
-          subCount={team.weekly_closed?.at(-1)?.subtask_count}
-        />
-        <MetricCard
-          label="今週 新規起票"
-          value={team.weekly_created?.at(-1)?.count ?? 0}
-          subCount={team.weekly_created?.at(-1)?.subtask_count}
-        />
+        <MetricCard label="今週クローズ" value={team.weekly_closed?.at(-1)?.count ?? 0} />
+        <MetricCard label="今週 新規起票" value={team.weekly_created?.at(-1)?.count ?? 0} />
         {(() => {
           const closed = team.weekly_closed?.at(-1)?.count ?? 0;
           const created = team.weekly_created?.at(-1)?.count ?? 0;
@@ -149,7 +138,7 @@ export default function OverviewPage() {
   );
 }
 
-function MetricCard({ label, value, alert, subCount }: { label: string; value: number | string; alert?: boolean; subCount?: number }) {
+function MetricCard({ label, value, alert }: { label: string; value: number | string; alert?: boolean }) {
   return (
     <div className={`rounded-xl p-4 border transition-all ${
       alert
@@ -158,9 +147,6 @@ function MetricCard({ label, value, alert, subCount }: { label: string; value: n
     }`}>
       <p className="text-xs text-gray-400 mb-1">{label}</p>
       <p className={`text-2xl font-bold ${alert ? "text-red-600 dark:text-red-400" : "text-gray-800 dark:text-gray-100"}`}>{value}</p>
-      {subCount !== undefined && (
-        <p className="text-xs text-gray-400">（うちサブタスク {subCount}件）</p>
-      )}
     </div>
   );
 }
