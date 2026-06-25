@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config as cfg
 from jira_monitor import (
     JiraClient, JST, CLOSE_STATUSES, check_stale, _parse_jira_dt, _jql_datetime,
-    _resolved_jql, _jql_list,
+    _resolved_jql, _jql_list, expand_weekly_labels,
 )
 
 # ---------------------------------------------------------------------------
@@ -719,6 +719,9 @@ def main():
         sys.exit(1)
 
     client = JiraClient(conf)
+    added_labels = expand_weekly_labels(client, conf)
+    if added_labels:
+        print(f"🏷️  ラベル自動展開: +{len(added_labels)} 件 ({', '.join(added_labels[:5])}{'...' if len(added_labels) > 5 else ''})", file=sys.stderr)
     now_str = datetime.now(tz=JST).isoformat()
 
     print("📊 チームサマリーを取得中...")

@@ -238,6 +238,100 @@ class JiraClient:
         )
         return data["count"]
 
+    def fetch_label_suggestions(self, prefix: str) -> list[str]:
+        """Jira のラベル自動補完 API を使って prefix にマッチするラベル値を返す。
+
+        Endpoint: GET /rest/api/3/jql/autocompletedata/suggestions
+        ?fieldName=labels&fieldValue={prefix}
+
+        Jira は最大 ~100 件を返す。ラベル数がそれを超える運用は想定外。
+        """
+        data = self._request_json(
+            "GET",
+            "/rest/api/3/jql/autocompletedata/suggestions",
+            query={"fieldName": "labels", "fieldValue": prefix},
+        )
+        results = data.get("results", []) or []
+        # value はハイライト用に <b>...</b> が混ざることがあるため除去
+        labels: list[str] = []
+        for item in results:
+            v = item.get("value") or ""
+            v = v.replace("<b>", "").replace("</b>", "")
+            if v:
+                labels.append(v)
+        return labels
+
+
+def _fetch_labels_recursive(
+    client: "JiraClient",
+    prefix: str,
+    *,
+    threshold: int = 15,
+    depth: int = 0,
+    max_depth: int = 8,
+) -> set[str]:
+    """Jira autocomplete API は ~15 件で結果をキャップするため、上限に達したら
+    `prefix + 0..9` で再帰的に深掘りして取りこぼしを防ぐ。
+
+    threshold: この件数以上返ったら深掘り対象とみなす
+    max_depth: 暴走防止（YYYYMMDD まで対応する 8 桁を想定）
+    """
+    out = set(client.fetch_label_suggestions(prefix))
+    if len(out) >= threshold and depth < max_depth:
+        for d in "0123456789":
+            out.update(
+                _fetch_labels_recursive(
+                    client, prefix + d, threshold=threshold, depth=depth + 1, max_depth=max_depth
+                )
+            )
+    return out
+
+
+def expand_weekly_labels(client: "JiraClient", conf: cfg.Config) -> list[str]:
+    """conf.weekly_label_pattern が指定されていれば Jira から該当ラベルを取得して
+    conf.weekly_labels に追加する。重複は除去。
+
+    Jira の autocomplete API は前方一致で上位 ~15 件しか返さないため、
+    `_fetch_labels_recursive` で件数キャップ時に深掘りして全件取得する。
+
+    展開に失敗した場合は元のラベルを保持して警告のみ出す（実行は続ける）。
+    Returns 追加された新規ラベル一覧（ログ用）。
+    """
+    import re as _re
+
+    pattern = getattr(conf, "weekly_label_pattern", None)
+    if not pattern:
+        return []
+
+    try:
+        regex = _re.compile(pattern)
+    except _re.error as e:
+        print(f"⚠️  WEEKLY_LABEL_PATTERN が不正な正規表現です: {e}", file=sys.stderr)
+        return []
+
+    # prefix 推定: 正規表現の先頭にある固定文字列を抜き出す（^を除く、最初のメタ文字で終わる）
+    prefix_match = _re.match(r"^\^?([^\\\[\(\.\*\+\?\{\|]+)", pattern)
+    prefix = prefix_match.group(1) if prefix_match else ""
+    if not prefix:
+        print(
+            "⚠️  WEEKLY_LABEL_PATTERN から prefix を抽出できませんでした。ラベル展開をスキップ",
+            file=sys.stderr,
+        )
+        return []
+
+    try:
+        candidates = _fetch_labels_recursive(client, prefix)
+    except (RuntimeError, urllib.error.URLError) as e:
+        print(f"⚠️  ラベル候補取得失敗（既存ラベルのまま続行）: {e}", file=sys.stderr)
+        return []
+
+    matched = [label for label in candidates if regex.match(label)]
+    existing = set(conf.weekly_labels)
+    added = sorted(label for label in matched if label not in existing)
+    if added:
+        conf.weekly_labels = list(conf.weekly_labels) + added
+    return added
+
 
 # ---------------------------------------------------------------------------
 # チェック関数
@@ -1139,6 +1233,12 @@ def main():
         sys.exit(1)
 
     client = JiraClient(conf)
+    added_labels = expand_weekly_labels(client, conf)
+    if added_labels:
+        print(
+            f"🏷️  ラベル自動展開: +{len(added_labels)} 件 ({', '.join(added_labels[:5])}{'...' if len(added_labels) > 5 else ''})",
+            file=sys.stderr,
+        )
 
     try:
         if args.daily:
