@@ -433,6 +433,34 @@ def build_overdue_ranking(client: JiraClient, conf: cfg.Config) -> list:
     return sorted(results, key=lambda x: -x["days_overdue"])
 
 
+def build_neglected_ranking(client: JiraClient, conf: cfg.Config) -> list[dict]:
+    """未完了チケットを起票日からの経過日数順に返す"""
+    now = datetime.now(tz=JST)
+    jql = conf.board_member_jql(
+        f"statusCategory != Done{_label_filter(conf)}",
+        order_by="created ASC"
+    )
+    issues = client.search(jql, ["summary", "assignee", "status", "created", "issuetype"], max_results=1000)
+    base_url = conf.base_url.rstrip("/")
+    results = []
+    for issue in issues:
+        created_str = issue["fields"].get("created")
+        if not created_str:
+            continue
+        created = _parse_jira_dt(created_str)
+        days = (now - created).days
+        results.append({
+            "key": issue["key"],
+            "summary": issue["fields"].get("summary", ""),
+            "assignee": _assignee_name(issue),
+            "status": issue["fields"].get("status", {}).get("name", ""),
+            "created": created.strftime("%Y-%m-%d"),
+            "days_since_created": days,
+            "url": f"{base_url}/browse/{issue['key']}",
+        })
+    return sorted(results, key=lambda x: -x["days_since_created"])[:20]
+
+
 def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
     """WIP超過状況"""
     in_progress = _get_in_progress(client, conf)
@@ -712,6 +740,10 @@ def main():
     print("⚠️  期限超過ランキングを取得中...")
     overdue = build_overdue_ranking(client, conf)
     _write(out_dir / "overdue_ranking.json", overdue)
+
+    print("📥 放置チケットランキングを取得中...")
+    neglected = build_neglected_ranking(client, conf)
+    _write(out_dir / "neglected_ranking.json", neglected)
 
     print("📋 WIP状況を取得中...")
     wip = build_wip_status(client, conf)
