@@ -25,7 +25,8 @@ export default function MembersPage() {
           <tbody>
             {memberNames.map((name) => {
               const m = stats.members[name];
-              const lastWeek = m?.weeks?.at(-1)?.closed ?? 0;
+              const lastWeekData = m?.weeks?.at(-1);
+              const lastWeek = lastWeekData?.closed ?? 0;
               const overLimit = (m?.in_progress ?? 0) > (stats.wip_limit ?? 3);
               return (
                 <tr key={name} className="border-t border-gray-100 dark:border-gray-800">
@@ -33,7 +34,12 @@ export default function MembersPage() {
                   <td className={`px-4 py-2 text-right ${overLimit ? "text-red-600 font-bold" : ""}`}>
                     {m?.in_progress ?? 0}
                   </td>
-                  <td className="px-4 py-2 text-right">{lastWeek}</td>
+                  <td className="px-4 py-2 text-right">
+                    <div>{lastWeek}</div>
+                    {lastWeekData?.subtask_count !== undefined && (
+                      <div className="text-xs text-gray-400">（うちサブタスク {lastWeekData.subtask_count}件）</div>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-right">
                     {overLimit ? "🚨 超過" : "✅ 正常"}
                   </td>

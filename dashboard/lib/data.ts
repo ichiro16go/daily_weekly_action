@@ -32,8 +32,8 @@ export interface TeamSummary {
     p95_threshold?: number;
     raw_count?: number;
   }[];
-  weekly_closed: { week: string; count: number }[];
-  weekly_created?: { week: string; count: number }[];
+  weekly_closed: { week: string; count: number; subtask_count?: number }[];
+  weekly_created?: { week: string; count: number; subtask_count?: number }[];
   weekly_close_rate?: { week: string; closed: number; created: number; rate: number }[];
   current_wip: number;
   wip_limit: number;
@@ -41,8 +41,9 @@ export interface TeamSummary {
 
 export interface MemberStats {
   members: Record<string, {
-    weeks: { week: string; closed: number }[];
+    weeks: { week: string; closed: number; subtask_count?: number }[];
     in_progress: number;
+    in_progress_subtask_count?: number;
   }>;
   wip_limit: number;
 }
@@ -109,7 +110,9 @@ export interface KpiData {
   };
   current: {
     total_closed: number;
+    total_closed_subtasks?: number;
     total_created?: number;
+    total_created_subtasks?: number;
     close_rate?: number;
     weekly_closed: number;
     weeks_elapsed: number;

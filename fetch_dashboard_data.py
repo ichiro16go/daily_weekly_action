@@ -188,6 +188,29 @@ def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
     return client.count(jql)
 
 
+def _get_created_subtasks_in_range(client: JiraClient, conf: cfg.Config, start, end):
+    """指定期間に起案（created）されたサブタスク件数を返す。"""
+    start_jql = _jql_datetime(start)
+    end_jql = _jql_datetime(end)
+    extra = (
+        f'created >= {start_jql} AND created < {end_jql} '
+        f'AND issuetype in subtaskIssueTypes(){_label_filter(conf)}'
+    )
+    jql = conf.board_member_jql(extra)
+    return client.count(jql)
+
+
+def _is_subtask_issue(issue) -> bool:
+    """Jira issue dict の issuetype.subtask が true かを返す。"""
+    issuetype = issue.get("fields", {}).get("issuetype") or {}
+    return bool(issuetype.get("subtask"))
+
+
+def _count_subtasks_in_issues(issues) -> int:
+    """issue list 内のサブタスク件数を返す。"""
+    return sum(1 for issue in issues if _is_subtask_issue(issue))
+
+
 def _safe_rate(numerator: int, denominator: int) -> float:
     """0 除算ガード付きで比率を返す（小数点 3 桁、0.0 〜 ∞）。"""
     if denominator <= 0:
@@ -199,7 +222,11 @@ def _get_in_progress(client: JiraClient, conf: cfg.Config):
     """現在IN PROGRESSのチケットを返す（ラベルフィルタ適用）"""
     extra = f'status = "In Progress"{_label_filter(conf)}'
     jql = conf.board_member_jql(extra, order_by="assignee ASC")
-    return client.search(jql, ["summary", "assignee", "created", "updated", "duedate"], max_results=200)
+    return client.search(
+        jql,
+        ["summary", "assignee", "created", "updated", "duedate", "issuetype"],
+        max_results=200,
+    )
 
 
 def _label_filter(conf: cfg.Config) -> str:
@@ -272,10 +299,20 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
     for start, end in week_ranges[-8:]:  # 直近8週
         issues = _get_closed_in_range(client, conf, start, end)
         created_count = _get_created_in_range(client, conf, start, end)
+        created_subtask_count = _get_created_subtasks_in_range(client, conf, start, end)
         label = start.strftime("%m/%d")
         closed_count = len(issues)
-        weekly_closed.append({"week": label, "count": closed_count})
-        weekly_created.append({"week": label, "count": created_count})
+        closed_subtask_count = _count_subtasks_in_issues(issues)
+        weekly_closed.append({
+            "week": label,
+            "count": closed_count,
+            "subtask_count": closed_subtask_count,
+        })
+        weekly_created.append({
+            "week": label,
+            "count": created_count,
+            "subtask_count": created_subtask_count,
+        })
         # EPGPRD-311: 同一週内の close/create 比率
         weekly_close_rate.append({
             "week": label,
@@ -351,16 +388,24 @@ def build_member_stats(client: JiraClient, conf: cfg.Config) -> dict:
         for issue in issues:
             name = _assignee_name(issue)
             if name not in members:
-                members[name] = {"weeks": [], "in_progress": 0}
+                members[name] = {
+                    "weeks": [],
+                    "in_progress": 0,
+                    "in_progress_subtask_count": 0,
+                }
         # 今週分の完了数をカウント
         week_count: dict[str, int] = {}
+        week_subtask_count: dict[str, int] = {}
         for issue in issues:
             name = _assignee_name(issue)
             week_count[name] = week_count.get(name, 0) + 1
+            if _is_subtask_issue(issue):
+                week_subtask_count[name] = week_subtask_count.get(name, 0) + 1
         for name in members:
             members[name]["weeks"].append({
                 "week": week_label,
                 "closed": week_count.get(name, 0),
+                "subtask_count": week_subtask_count.get(name, 0),
             })
 
     # 対応中数
@@ -368,8 +413,14 @@ def build_member_stats(client: JiraClient, conf: cfg.Config) -> dict:
     for issue in in_progress:
         name = _assignee_name(issue)
         if name not in members:
-            members[name] = {"weeks": [], "in_progress": 0}
+            members[name] = {
+                "weeks": [],
+                "in_progress": 0,
+                "in_progress_subtask_count": 0,
+            }
         members[name]["in_progress"] += 1
+        if _is_subtask_issue(issue):
+            members[name]["in_progress_subtask_count"] += 1
 
     return {"members": members, "wip_limit": conf.wip_limit}
 
@@ -610,13 +661,15 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     current_jql = f'{_resolved_jql(half_start, now)}{label_filter}'
     current_issues = client.search(
         conf.board_member_jql(current_jql),
-        ["created", "resolutiondate"],
+        ["created", "resolutiondate", "issuetype"],
         max_results=500,
     )
     half_total = len(current_issues)
+    half_subtask_total = _count_subtasks_in_issues(current_issues)
 
     # 半期累計の起案数・閉じ率（EPGPRD-309 / EPGPRD-311）
     half_created_total = _get_created_in_range(client, conf, half_start, now)
+    half_created_subtask_total = _get_created_subtasks_in_range(client, conf, half_start, now)
     half_close_rate = _safe_rate(half_total, half_created_total)
 
     # リードタイム計算
@@ -665,7 +718,9 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
         },
         "current": {
             "total_closed": half_total,
+            "total_closed_subtasks": half_subtask_total,
             "total_created": half_created_total,
+            "total_created_subtasks": half_created_subtask_total,
             "close_rate": half_close_rate,
             "weekly_closed": actual_weekly,
             "weeks_elapsed": weeks_elapsed,
