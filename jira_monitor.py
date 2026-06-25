@@ -710,7 +710,7 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         assignee_map.values(), key=lambda x: x.closed_this_week, reverse=True
     )
     overdue = [
-        _brief(issue, detail=f"期限: {issue['fields'].get('duedate') or '-'}")
+        _brief(issue, detail=f"終了: {issue['fields'].get('duedate') or '-'}")
         for issue in overdue_issues
     ]
     unassigned = [_brief(issue) for issue in unassigned_issues]

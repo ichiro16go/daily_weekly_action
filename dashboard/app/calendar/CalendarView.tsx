@@ -202,8 +202,8 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                                 ? `開始: ${task.startDate}`
                                                 : `開始: 未設定 (起案 ${task.created})`;
                                         const endSourceLabel = task.hasDueDate
-                                            ? `期限: ${task.dueDate}`
-                                            : `期限: 未設定`;
+                                            ? `終了: ${task.dueDate}`
+                                            : `終了: 未設定`;
                                         const tooltip = [
                                             `${task.key} · ${task.summary}`,
                                             `状態: ${task.status}`,
