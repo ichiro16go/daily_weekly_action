@@ -78,8 +78,10 @@ class Config:
     # 空文字なら自動展開を行わない。
     weekly_label_pattern: str | None = r"^運用保守\d{6}$"
     include_subtasks: bool = True  # サブタスクを集計に含めるか（既定: true）
-    # Jira の Start Date カスタムフィールド ID (例: customfield_10015)。空ならフォールバック動作。
-    start_date_field: str = "customfield_10015"
+    # Jira の開始日(WBSGantt) カスタムフィールド ID。空ならフォールバック動作。
+    start_date_field: str = "customfield_10200"
+    # Jira の終了日(WBSGantt) カスタムフィールド ID。空なら duedate フォールバックのみ。
+    end_date_field: str = "customfield_10201"
 
     def projects_jql(self) -> str:
         """project in (JPREQ, EPGQC, ...) 形式の JQL 断片を返す"""
@@ -135,7 +137,8 @@ def load() -> Config:
     include_subtasks_raw = os.environ.get("INCLUDE_SUBTASKS", "true").strip().lower()
     include_subtasks = include_subtasks_raw not in ("false", "0", "no", "off")
 
-    start_date_field = os.environ.get("JIRA_START_DATE_FIELD", "customfield_10015").strip()
+    start_date_field = os.environ.get("JIRA_START_DATE_FIELD", "customfield_10200").strip()
+    end_date_field = os.environ.get("JIRA_END_DATE_FIELD", "customfield_10201").strip()
 
     # ラベル自動展開パターン（環境変数で上書き可、空文字なら無効化）
     label_pattern_env = os.environ.get("WEEKLY_LABEL_PATTERN")
@@ -169,4 +172,5 @@ def load() -> Config:
         weekly_label_pattern=weekly_label_pattern,
         include_subtasks=include_subtasks,
         start_date_field=start_date_field,
+        end_date_field=end_date_field,
     )

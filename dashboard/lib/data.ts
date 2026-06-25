@@ -86,6 +86,7 @@ export interface CalendarData {
       summary: string;
       status: string;
       dueDate: string | null;
+      endDateSource?: "wbsgantt" | "duedate" | null;
       startDate: string | null;
       created: string;
       priority: string;
