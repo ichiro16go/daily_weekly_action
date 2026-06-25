@@ -86,6 +86,7 @@ export interface CalendarData {
       summary: string;
       status: string;
       dueDate: string | null;
+      startDate: string | null;
       created: string;
       priority: string;
       url: string;

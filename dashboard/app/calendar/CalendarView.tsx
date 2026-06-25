@@ -8,11 +8,15 @@ const DAY_COLUMN_WIDTH = 52;
 const BAR_HEIGHT = 28;
 const BAR_GAP = 8;
 
-type ViewMode = "weekly" | "monthly";
-
 type VisibleTask = CalendarData["members"][string]["tasks"][number] & {
     start: Date;
     end: Date;
+    rawStart: Date;
+    rawEnd: Date;
+    hasStartDate: boolean;
+    hasDueDate: boolean;
+    isBeforeRange: boolean;
+    isAfterRange: boolean;
     lane: number;
     left: number;
     width: number;
@@ -23,7 +27,6 @@ export function CalendarView({ data }: { data: CalendarData }) {
         () => (data.generated_at ? new Date(data.generated_at) : new Date()),
         [data.generated_at],
     );
-    const [viewMode, setViewMode] = useState<ViewMode>("monthly");
     const [anchorDate, setAnchorDate] = useState(initialDate);
 
     const today = useMemo(
@@ -34,13 +37,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
         [data.generated_at],
     );
 
-    const range = useMemo(
-        () =>
-            viewMode === "weekly"
-                ? getWeekRange(anchorDate)
-                : getMonthRange(anchorDate),
-        [anchorDate, viewMode],
-    );
+    const range = useMemo(() => getMonthRange(anchorDate), [anchorDate]);
 
     const days = useMemo(
         () => listDays(range.start, range.end),
@@ -53,48 +50,19 @@ export function CalendarView({ data }: { data: CalendarData }) {
         <section className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm">
             <div className="flex flex-col gap-4 border-b border-gray-100 dark:border-gray-800 px-4 py-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("weekly")}
-                            className={`px-3 py-1 text-xs rounded-md transition-all ${
-                                viewMode === "weekly"
-                                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm font-medium"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                            }`}
-                        >
-                            週次
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("monthly")}
-                            className={`px-3 py-1 text-xs rounded-md transition-all ${
-                                viewMode === "monthly"
-                                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm font-medium"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                            }`}
-                        >
-                            月次
-                        </button>
-                    </div>
-
                     <div className="flex items-center gap-2">
                         <NavButton
-                            label="前へ"
+                            label="前月"
                             onClick={() =>
-                                setAnchorDate(
-                                    shiftAnchor(anchorDate, viewMode, -1),
-                                )
+                                setAnchorDate(shiftAnchor(anchorDate, -1))
                             }
                         >
                             ←
                         </NavButton>
                         <NavButton
-                            label="次へ"
+                            label="次月"
                             onClick={() =>
-                                setAnchorDate(
-                                    shiftAnchor(anchorDate, viewMode, 1),
-                                )
+                                setAnchorDate(shiftAnchor(anchorDate, 1))
                             }
                         >
                             →
@@ -125,6 +93,10 @@ export function CalendarView({ data }: { data: CalendarData }) {
                     <Legend
                         label="期限超過(14日〜)"
                         className="bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500"
+                    />
+                    <Legend
+                        label="開始/期限 未設定"
+                        className="bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-600 border-dashed"
                     />
                 </div>
             </div>
@@ -168,6 +140,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                             member.tasks ?? [],
                             range.start,
                             range.end,
+                            today,
                         );
                         const lanes = Math.max(
                             tasks.reduce(
@@ -220,17 +193,41 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                                   0,
                                               )
                                             : 0;
+                                        const dueOutsideRange =
+                                            !!task.dueDate &&
+                                            (task.rawEnd < range.start ||
+                                                task.rawEnd > range.end);
+                                        const startSourceLabel = task.hasStartDate
+                                            ? `開始: ${task.startDate}`
+                                            : `開始: 未設定 (起案 ${task.created})`;
+                                        const endSourceLabel = task.hasDueDate
+                                            ? `期限: ${task.dueDate}`
+                                            : `期限: 未設定`;
                                         const tooltip = [
                                             `${task.key} · ${task.summary}`,
                                             `状態: ${task.status}`,
-                                            `期限: ${task.dueDate ?? "未設定"}`,
+                                            startSourceLabel,
+                                            endSourceLabel,
                                             `経過日数: ${elapsedDays}日`,
                                             overdueDays > 0
                                                 ? `期限超過: ${overdueDays}日`
                                                 : null,
+                                            dueOutsideRange && task.dueDate
+                                                ? `(表示月外: ${formatMonthDay(parseDate(task.dueDate))})`
+                                                : null,
+                                            !task.hasStartDate && !task.hasDueDate
+                                                ? "※ 開始日・終了日が未設定のためバー位置は概算です"
+                                                : null,
                                         ]
                                             .filter(Boolean)
                                             .join("\n");
+                                        const showOverdueDateInLabel =
+                                            overdueDays > 0 &&
+                                            dueOutsideRange &&
+                                            task.dueDate;
+                                        const labelText = showOverdueDateInLabel
+                                            ? `${task.key} · ${task.summary}（期限 ${formatMonthDay(parseDate(task.dueDate!))}）`
+                                            : `${task.key} · ${task.summary}`;
                                         return (
                                             <a
                                                 key={`${name}-${task.key}-${task.created}`}
@@ -253,7 +250,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                                 }}
                                             >
                                                 <span className="truncate">
-                                                    {task.key} · {task.summary}
+                                                    {labelText}
                                                 </span>
                                             </a>
                                         );
@@ -342,21 +339,29 @@ function layoutTasks(
     tasks: CalendarData["members"][string]["tasks"],
     rangeStart: Date,
     rangeEnd: Date,
+    today: Date,
 ): VisibleTask[] {
     const visible = tasks
         .map((task) => {
-            const rawStart = parseDate(task.created);
-            const rawEnd = task.dueDate ? parseDate(task.dueDate) : rangeEnd;
+            const hasStartDate = !!task.startDate;
+            const hasDueDate = !!task.dueDate;
+            // 開始日: Jira Start Date 優先、無ければ created にフォールバック
+            const rawStart = parseDate(task.startDate ?? task.created);
+            // 終了日: Jira Due Date 優先、無ければ「今日」（進行中継続を示唆）にフォールバック
+            const rawEnd = task.dueDate ? parseDate(task.dueDate) : today;
 
-            // Skip only tasks created after the visible range
+            // 全くレンジ外（未来開始、または過去終了でクランプ不要）
+            // 開始がレンジより未来 → 表示しない
             if (rawStart > rangeEnd) {
                 return null;
             }
 
-            // Clamp to visible range for positioning
+            const isBeforeRange = rawEnd < rangeStart;
+            const isAfterRange = rawStart > rangeEnd;
+
+            // 表示位置: クランプ
             const start = maxDate(rawStart, rangeStart);
-            const end = minDate(rawEnd, rangeEnd);
-            // Overdue or entirely before range: pin to range start
+            const end = minDate(maxDate(rawEnd, rawStart), rangeEnd);
             const clampedStart = start > end ? rangeStart : start;
             const clampedEnd = start > end ? rangeStart : end;
 
@@ -364,6 +369,12 @@ function layoutTasks(
                 ...task,
                 start: clampedStart,
                 end: clampedEnd,
+                rawStart,
+                rawEnd,
+                hasStartDate,
+                hasDueDate,
+                isBeforeRange,
+                isAfterRange,
                 lane: 0,
                 left:
                     daysBetween(rangeStart, clampedStart) * DAY_COLUMN_WIDTH +
@@ -399,10 +410,13 @@ function layoutTasks(
 }
 
 function getTaskClassName(task: VisibleTask, today: Date) {
+    // 開始・期限ともに未設定 → 視認性のため薄い amber + 点線枠で表現
+    if (!task.hasStartDate && !task.hasDueDate) {
+        return "bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600 border-dashed text-amber-800 dark:text-amber-200";
+    }
     if (task.dueDate) {
         const due = parseDate(task.dueDate);
         if (due < today) {
-            // 期限超過: 日数に応じて濃度を変える
             const overdueDays = daysBetween(due, today);
             if (overdueDays >= 14) {
                 return "bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500 text-white";
@@ -419,29 +433,8 @@ function getTaskClassName(task: VisibleTask, today: Date) {
     return "bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600";
 }
 
-function shiftAnchor(anchor: Date, viewMode: ViewMode, direction: -1 | 1) {
-    const next = new Date(anchor);
-    if (viewMode === "weekly") {
-        next.setDate(next.getDate() + direction * 7);
-        return next;
-    }
-
-    return new Date(next.getFullYear(), next.getMonth() + direction, 1);
-}
-
-function getWeekRange(date: Date) {
-    const start = startOfDay(date);
-    start.setDate(
-        start.getDate() - start.getDay() + (start.getDay() === 0 ? -6 : 1),
-    );
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-
-    return {
-        start,
-        end,
-        label: `${formatMonthDay(start)} - ${formatMonthDay(end)}`,
-    };
+function shiftAnchor(anchor: Date, direction: -1 | 1) {
+    return new Date(anchor.getFullYear(), anchor.getMonth() + direction, 1);
 }
 
 function getMonthRange(date: Date) {

@@ -487,9 +487,13 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
     """メンバーごとの未完了チケットをカレンダー表示用に整形"""
     # overviewの「対応中」と同じフィルタ（In Progress + ラベル）を使用
     extra = f'status = "In Progress"{_label_filter(conf)}'
+    fields = ["summary", "assignee", "status", "duedate", "created", "updated", "priority"]
+    start_field = (conf.start_date_field or "").strip()
+    if start_field:
+        fields.append(start_field)
     issues = client.search(
         conf.board_member_jql(extra, order_by="assignee ASC, duedate ASC, created ASC"),
-        ["summary", "assignee", "status", "duedate", "created", "updated", "priority"],
+        fields,
         max_results=500,
     )
 
@@ -500,18 +504,29 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
         name = _assignee_name(issue)
         if cfg.CALENDAR_MEMBERS and not any(name.startswith(s) for s in cfg.CALENDAR_MEMBERS):
             continue
-        fields = issue["fields"]
-        created = fields.get("created")
+        f = issue["fields"]
+        created = f.get("created")
         if not created:
             continue
 
+        raw_start = f.get(start_field) if start_field else None
+        # Jira may return start date as 'YYYY-MM-DD' or full ISO datetime
+        if raw_start and "T" in str(raw_start):
+            try:
+                start_date = _parse_jira_dt(raw_start).date().isoformat()
+            except Exception:
+                start_date = str(raw_start)[:10]
+        else:
+            start_date = raw_start or None
+
         task = {
             "key": issue["key"],
-            "summary": fields.get("summary", ""),
-            "status": (fields.get("status") or {}).get("name", ""),
-            "dueDate": fields.get("duedate"),
+            "summary": f.get("summary", ""),
+            "status": (f.get("status") or {}).get("name", ""),
+            "dueDate": f.get("duedate"),
+            "startDate": start_date,
             "created": _parse_jira_dt(created).date().isoformat(),
-            "priority": ((fields.get("priority") or {}).get("name")) or "未設定",
+            "priority": ((f.get("priority") or {}).get("name")) or "未設定",
             "url": f"{base_url}/browse/{issue['key']}",
         }
 
@@ -525,7 +540,7 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
                 payload["tasks"],
                 key=lambda task: (
                     task["dueDate"] or "9999-12-31",
-                    task["created"],
+                    task["startDate"] or task["created"],
                     task["key"],
                 ),
             )

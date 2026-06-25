@@ -113,6 +113,25 @@ class IncludeSubtasksDefaultTests(unittest.TestCase):
         self.assertTrue(c.include_subtasks)
 
 
+class StartDateFieldTests(unittest.TestCase):
+    def test_default_is_customfield_10015(self) -> None:
+        with patch.dict(os.environ, _BASE_ENV, clear=True):
+            c = cfg.load()
+        self.assertEqual(c.start_date_field, "customfield_10015")
+
+    def test_env_override(self) -> None:
+        env = {**_BASE_ENV, "JIRA_START_DATE_FIELD": "customfield_12345"}
+        with patch.dict(os.environ, env, clear=True):
+            c = cfg.load()
+        self.assertEqual(c.start_date_field, "customfield_12345")
+
+    def test_env_empty_disables(self) -> None:
+        env = {**_BASE_ENV, "JIRA_START_DATE_FIELD": ""}
+        with patch.dict(os.environ, env, clear=True):
+            c = cfg.load()
+        self.assertEqual(c.start_date_field, "")
+
+
 class BoardJqlSubtaskClauseTests(unittest.TestCase):
     def _make(self, include: bool) -> cfg.Config:
         return _make_config(include_subtasks=include)
