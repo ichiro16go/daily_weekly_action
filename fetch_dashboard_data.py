@@ -499,8 +499,11 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
     extra = f'status = "In Progress"{_label_filter(conf)}'
     fields = ["summary", "assignee", "status", "duedate", "created", "updated", "priority"]
     start_field = (conf.start_date_field or "").strip()
-    if start_field:
+    end_field = (conf.end_date_field or "").strip()
+    if start_field and start_field not in fields:
         fields.append(start_field)
+    if end_field and end_field not in fields:
+        fields.append(end_field)
     issues = client.search(
         conf.board_member_jql(extra, order_by="assignee ASC, duedate ASC, created ASC"),
         fields,
@@ -529,11 +532,28 @@ def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
         else:
             start_date = raw_start or None
 
+        raw_end = f.get(end_field) if end_field else None
+        if raw_end:
+            end_date_source = "wbsgantt"
+        else:
+            raw_end = f.get("duedate")
+            end_date_source = "duedate" if raw_end else None
+
+        # Jira may return end date as 'YYYY-MM-DD' or full ISO datetime
+        if raw_end and "T" in str(raw_end):
+            try:
+                due_date = _parse_jira_dt(raw_end).date().isoformat()
+            except Exception:
+                due_date = str(raw_end)[:10]
+        else:
+            due_date = raw_end or None
+
         task = {
             "key": issue["key"],
             "summary": f.get("summary", ""),
             "status": (f.get("status") or {}).get("name", ""),
-            "dueDate": f.get("duedate"),
+            "dueDate": due_date,
+            "endDateSource": end_date_source,
             "startDate": start_date,
             "created": _parse_jira_dt(created).date().isoformat(),
             "priority": ((f.get("priority") or {}).get("name")) or "未設定",
