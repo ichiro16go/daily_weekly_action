@@ -157,10 +157,15 @@ def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
 
 
 def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
-    """指定期間に起案（created）されたチケット件数を返す。"""
+    """指定期間に起案（created）されたチケット件数を返す。
+
+    NOTE: `_jql_datetime` はすでにダブルクォート込みの文字列を返すため、
+    f-string 内で追加で `"` を付けてはならない（過去にこれが原因で常に 0 件
+    返るバグがあった。週報側 jira_monitor.build_weekly_summary の実装に揃える）。
+    """
     start_jql = _jql_datetime(start)
     end_jql = _jql_datetime(end)
-    extra = f'created >= "{start_jql}" AND created < "{end_jql}"{_label_filter(conf)}'
+    extra = f'created >= {start_jql} AND created < {end_jql}{_label_filter(conf)}'
     jql = conf.board_member_jql(extra)
     return client.count(jql)
 
@@ -242,7 +247,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "raw_count": len(lead_times),
         })
 
-    # 週次クローズ・対応中数
+    # 週次クローズ・対応中数（同じループで起案数と閉じ率も集計）
     weekly_closed = []
     weekly_created = []
     weekly_close_rate = []
@@ -260,13 +265,6 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "created": created_count,
             "rate": _safe_rate(closed_count, created_count),
         })
-
-    # 週次起案数（EPGPRD-309）— 直近8週
-    weekly_created = []
-    for start, end in week_ranges[-8:]:
-        count = _get_created_in_range(client, conf, start, end)
-        label = start.strftime("%m/%d")
-        weekly_created.append({"week": label, "count": count})
 
     # 週次リードタイム（直近12週）
     weekly_leadtime = []
