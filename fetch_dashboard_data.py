@@ -157,12 +157,19 @@ def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
 
 
 def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
-    """指定期間に起案（created）されたチケット件数を返す。EPGPRD-309."""
+    """指定期間に起案（created）されたチケット件数を返す。"""
     start_jql = _jql_datetime(start)
     end_jql = _jql_datetime(end)
     extra = f'created >= "{start_jql}" AND created < "{end_jql}"{_label_filter(conf)}'
     jql = conf.board_member_jql(extra)
     return client.count(jql)
+
+
+def _safe_rate(numerator: int, denominator: int) -> float:
+    """0 除算ガード付きで比率を返す（小数点 3 桁、0.0 〜 ∞）。"""
+    if denominator <= 0:
+        return 0.0
+    return round(numerator / denominator, 3)
 
 
 def _get_in_progress(client: JiraClient, conf: cfg.Config):
@@ -237,10 +244,22 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
 
     # 週次クローズ・対応中数
     weekly_closed = []
+    weekly_created = []
+    weekly_close_rate = []
     for start, end in week_ranges[-8:]:  # 直近8週
         issues = _get_closed_in_range(client, conf, start, end)
+        created_count = _get_created_in_range(client, conf, start, end)
         label = start.strftime("%m/%d")
-        weekly_closed.append({"week": label, "count": len(issues)})
+        closed_count = len(issues)
+        weekly_closed.append({"week": label, "count": closed_count})
+        weekly_created.append({"week": label, "count": created_count})
+        # EPGPRD-311: 同一週内の close/create 比率
+        weekly_close_rate.append({
+            "week": label,
+            "closed": closed_count,
+            "created": created_count,
+            "rate": _safe_rate(closed_count, created_count),
+        })
 
     # 週次起案数（EPGPRD-309）— 直近8週
     weekly_created = []
@@ -298,6 +317,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
         "weekly_leadtime": weekly_leadtime,
         "weekly_closed": weekly_closed,
         "weekly_created": weekly_created,
+        "weekly_close_rate": weekly_close_rate,
         "current_wip": current_wip,
         "wip_limit": conf.wip_limit,
     }
@@ -564,8 +584,9 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     )
     half_total = len(current_issues)
 
-    # 今半期の起案数（EPGPRD-309）
+    # 半期累計の起案数・閉じ率（EPGPRD-309 / EPGPRD-311）
     half_created_total = _get_created_in_range(client, conf, half_start, now)
+    half_close_rate = _safe_rate(half_total, half_created_total)
 
     # リードタイム計算
     lead_times = []
@@ -614,6 +635,7 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
         "current": {
             "total_closed": half_total,
             "total_created": half_created_total,
+            "close_rate": half_close_rate,
             "weekly_closed": actual_weekly,
             "weeks_elapsed": weeks_elapsed,
             "lead_time_median": lt_median,
