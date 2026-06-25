@@ -24,6 +24,8 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
   const ltLabels = ltView === "weekly" ? ltWeeklyLabels : ltMonthlyLabels;
   const ltAvg = ltView === "weekly" ? ltWeeklyAvg : ltMonthlyAvg;
   const ltMedian = ltView === "weekly" ? ltWeeklyMedian : ltMonthlyMedian;
+  const ltSource = ltView === "weekly" ? team.weekly_leadtime ?? [] : team.monthly_leadtime ?? [];
+  const ltOutlierTotal = ltSource.reduce((s, x) => s + (x.outlier_count ?? 0), 0);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -76,6 +78,9 @@ export function OverviewCharts({ team }: { team: TeamSummary }) {
             { label: "中央値", data: ltMedian, borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.08)" },
           ]}
         />
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          P95 を超える外れ値 {ltOutlierTotal} 件を除外して集計
+        </p>
       </div>
     </div>
   );

@@ -54,6 +54,49 @@ def _calc_leadtime(issues, start, end):
     return lead_times, excluded_old
 
 
+def _calc_leadtime_stats(days_list: list[int]) -> dict:
+    """
+    リードタイム日数リストから P95 を計算し、P95 超を外れ値として除外した
+    avg/median/count/outlier_count/p95_threshold を返す。EPGPRD-313 用。
+
+    - 件数が 0 → すべてゼロ
+    - 件数が 1〜4 → 母数が少なすぎるので P95 除外を行わず元の値で集計
+    """
+    if not days_list:
+        return {
+            "avg_days": 0,
+            "median_days": 0,
+            "count": 0,
+            "outlier_count": 0,
+            "p95_threshold": 0,
+        }
+
+    sorted_days = sorted(days_list)
+    n = len(sorted_days)
+    if n < 5:
+        return {
+            "avg_days": round(sum(sorted_days) / n, 1),
+            "median_days": round(median(sorted_days), 1),
+            "count": n,
+            "outlier_count": 0,
+            "p95_threshold": float(sorted_days[-1]),
+        }
+    idx = max(int(round(0.95 * n)) - 1, 0)
+    p95 = sorted_days[idx]
+    kept = [d for d in days_list if d <= p95]
+    outliers = len(days_list) - len(kept)
+    if not kept:
+        kept = days_list
+        outliers = 0
+    return {
+        "avg_days": round(sum(kept) / len(kept), 1),
+        "median_days": round(median(kept), 1),
+        "count": len(kept),
+        "outlier_count": outliers,
+        "p95_threshold": float(p95),
+    }
+
+
 def _week_ranges(weeks: int = 26):
     """直近N週の(start, end)リストを返す（古い順）"""
     now = datetime.now(tz=JST)
@@ -178,12 +221,18 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
                 lead_times.append(days)
         avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
         med = round(median(lead_times), 1) if lead_times else 0
+        stats = _calc_leadtime_stats(lead_times)
         monthly_leadtime.append({
             "month": label,
-            "avg_days": avg,
-            "median_days": med,
-            "count": len(lead_times),
+            "avg_days": stats["avg_days"],
+            "median_days": stats["median_days"],
+            "count": stats["count"],
+            "outlier_count": stats["outlier_count"],
+            "p95_threshold": stats["p95_threshold"],
             "excluded_old_count": excluded_old,
+            "raw_avg_days": avg,
+            "raw_median_days": med,
+            "raw_count": len(lead_times),
         })
 
     # 週次クローズ・対応中数
@@ -225,13 +274,19 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
                 lead_times.append(days)
         avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
         med = round(median(lead_times), 1) if lead_times else 0
+        stats = _calc_leadtime_stats(lead_times)
         label = start.strftime("%m/%d")
         weekly_leadtime.append({
             "week": label,
-            "avg_days": avg,
-            "median_days": med,
-            "count": len(lead_times),
+            "avg_days": stats["avg_days"],
+            "median_days": stats["median_days"],
+            "count": stats["count"],
+            "outlier_count": stats["outlier_count"],
+            "p95_threshold": stats["p95_threshold"],
             "excluded_old_count": excluded_old,
+            "raw_avg_days": avg,
+            "raw_median_days": med,
+            "raw_count": len(lead_times),
         })
 
     # 現在の対応中数
@@ -314,12 +369,16 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
         for name, times in member_lt.items():
             if name not in members:
                 members[name] = []
+            stats = _calc_leadtime_stats(times)
             members[name].append({
                 "month": label,
-                "avg_days": round(sum(times) / len(times), 1),
-                "median_days": round(median(times), 1),
-                "count": len(times),
+                "avg_days": stats["avg_days"],
+                "median_days": stats["median_days"],
+                "count": stats["count"],
+                "outlier_count": stats["outlier_count"],
+                "p95_threshold": stats["p95_threshold"],
                 "excluded_old_count": member_excluded.get(name, 0),
+                "raw_count": len(times),
             })
 
     return {"members": members}
@@ -525,8 +584,9 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
         if days >= 0:
             lead_times.append(days)
 
-    lt_median = round(median(lead_times), 1) if lead_times else 0
-    lt_avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
+    lt_stats = _calc_leadtime_stats(lead_times)
+    lt_median = lt_stats["median_days"]
+    lt_avg = lt_stats["avg_days"]
 
     # 経過週数
     weeks_elapsed = round((now - half_start).days / 7.0, 1)
@@ -558,8 +618,11 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
             "weeks_elapsed": weeks_elapsed,
             "lead_time_median": lt_median,
             "lead_time_avg": lt_avg,
-            "lead_time_sample_count": len(lead_times),
+            "lead_time_sample_count": lt_stats["count"],
+            "lead_time_outlier_count": lt_stats["outlier_count"],
+            "lead_time_p95_threshold": lt_stats["p95_threshold"],
             "lead_time_excluded_old_count": excluded_old,
+            "lead_time_raw_sample_count": len(lead_times),
         },
         "previous": {
             "total_closed": prev_total,

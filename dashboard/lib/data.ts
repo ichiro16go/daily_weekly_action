@@ -14,8 +14,24 @@ function load<T>(filename: string): T {
 }
 
 export interface TeamSummary {
-  monthly_leadtime: { month: string; avg_days: number; median_days: number; count: number }[];
-  weekly_leadtime: { week: string; avg_days: number; median_days: number; count: number }[];
+  monthly_leadtime: {
+    month: string;
+    avg_days: number;
+    median_days: number;
+    count: number;
+    outlier_count?: number;
+    p95_threshold?: number;
+    raw_count?: number;
+  }[];
+  weekly_leadtime: {
+    week: string;
+    avg_days: number;
+    median_days: number;
+    count: number;
+    outlier_count?: number;
+    p95_threshold?: number;
+    raw_count?: number;
+  }[];
   weekly_closed: { week: string; count: number }[];
   weekly_created?: { week: string; count: number }[];
   current_wip: number;
