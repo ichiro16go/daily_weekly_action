@@ -96,7 +96,7 @@ export function CalendarView({ data }: { data: CalendarData }) {
                     />
                     <Legend
                         label="開始/期限 未設定"
-                        className="bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-500 border-dashed"
+                        className="bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-600 border-dashed"
                     />
                 </div>
             </div>
@@ -410,29 +410,27 @@ function layoutTasks(
 }
 
 function getTaskClassName(task: VisibleTask, today: Date) {
-    const dashedBorder =
-        !task.hasStartDate && !task.hasDueDate ? "border-dashed" : "";
-    let base: string;
+    // 開始・期限ともに未設定 → 視認性のため薄い amber + 点線枠で表現
+    if (!task.hasStartDate && !task.hasDueDate) {
+        return "bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600 border-dashed text-amber-800 dark:text-amber-200";
+    }
     if (task.dueDate) {
         const due = parseDate(task.dueDate);
         if (due < today) {
             const overdueDays = daysBetween(due, today);
             if (overdueDays >= 14) {
-                base = "bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500 text-white";
-            } else if (overdueDays >= 7) {
-                base = "bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-600";
-            } else {
-                base = "bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600";
+                return "bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500 text-white";
             }
-            return `${base} ${dashedBorder}`.trim();
+            if (overdueDays >= 7) {
+                return "bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-600";
+            }
+            return "bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600";
         }
     }
     if (task.status.toLowerCase().includes("progress")) {
-        base = "bg-indigo-200 dark:bg-indigo-800 border-indigo-400 dark:border-indigo-600";
-    } else {
-        base = "bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600";
+        return "bg-indigo-200 dark:bg-indigo-800 border-indigo-400 dark:border-indigo-600";
     }
-    return `${base} ${dashedBorder}`.trim();
+    return "bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600";
 }
 
 function shiftAnchor(anchor: Date, direction: -1 | 1) {
