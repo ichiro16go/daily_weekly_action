@@ -74,6 +74,8 @@ class Config:
     wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
     weekly_labels: list[str] = field(default_factory=lambda: ["運用保守"])  # 週報で絞り込むラベル（OR）
     include_subtasks: bool = True  # サブタスクを集計に含めるか（既定: true）
+    # Jira の Start Date カスタムフィールド ID (例: customfield_10015)。空ならフォールバック動作。
+    start_date_field: str = "customfield_10015"
 
     def projects_jql(self) -> str:
         """project in (JPREQ, EPGQC, ...) 形式の JQL 断片を返す"""
@@ -129,6 +131,8 @@ def load() -> Config:
     include_subtasks_raw = os.environ.get("INCLUDE_SUBTASKS", "true").strip().lower()
     include_subtasks = include_subtasks_raw not in ("false", "0", "no", "off")
 
+    start_date_field = os.environ.get("JIRA_START_DATE_FIELD", "customfield_10015").strip()
+
     missing = [
         k
         for k, v in [
@@ -152,4 +156,5 @@ def load() -> Config:
         wip_limit=wip_limit,
         weekly_labels=weekly_labels,
         include_subtasks=include_subtasks,
+        start_date_field=start_date_field,
     )
