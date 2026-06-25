@@ -115,8 +115,16 @@ export function CalendarView({ data }: { data: CalendarData }) {
                         className="bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600"
                     />
                     <Legend
-                        label="期限超過"
+                        label="期限超過(〜6日)"
                         className="bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600"
+                    />
+                    <Legend
+                        label="期限超過(7-13日)"
+                        className="bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-600"
+                    />
+                    <Legend
+                        label="期限超過(14日〜)"
+                        className="bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500"
                     />
                 </div>
             </div>
@@ -197,32 +205,59 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                     }}
                                 >
                                     <DayGrid days={days} today={today} />
-                                    {tasks.map((task) => (
-                                        <a
-                                            key={`${name}-${task.key}-${task.created}`}
-                                            href={task.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title={`${task.key}\n${task.summary}\n状態: ${task.status}\n期限: ${task.dueDate ?? "未設定"}`}
-                                            className={`absolute flex items-center rounded-lg border px-2 text-[11px] font-medium text-gray-700 dark:text-gray-100 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow ${getTaskClassName(
-                                                task,
-                                                today,
-                                            )}`}
-                                            style={{
-                                                left: task.left,
-                                                top:
-                                                    8 +
-                                                    task.lane *
-                                                        (BAR_HEIGHT + BAR_GAP),
-                                                width: task.width,
-                                                height: BAR_HEIGHT,
-                                            }}
-                                        >
-                                            <span className="truncate">
-                                                {task.key} · {task.summary}
-                                            </span>
-                                        </a>
-                                    ))}
+                                    {tasks.map((task) => {
+                                        const created = parseDate(task.created);
+                                        const elapsedDays = daysBetween(
+                                            created,
+                                            today,
+                                        );
+                                        const overdueDays = task.dueDate
+                                            ? Math.max(
+                                                  daysBetween(
+                                                      parseDate(task.dueDate),
+                                                      today,
+                                                  ),
+                                                  0,
+                                              )
+                                            : 0;
+                                        const tooltip = [
+                                            `${task.key} · ${task.summary}`,
+                                            `状態: ${task.status}`,
+                                            `期限: ${task.dueDate ?? "未設定"}`,
+                                            `経過日数: ${elapsedDays}日`,
+                                            overdueDays > 0
+                                                ? `期限超過: ${overdueDays}日`
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join("\n");
+                                        return (
+                                            <a
+                                                key={`${name}-${task.key}-${task.created}`}
+                                                href={task.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title={tooltip}
+                                                className={`absolute flex items-center rounded-lg border px-2 text-[11px] font-medium text-gray-700 dark:text-gray-100 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow ${getTaskClassName(
+                                                    task,
+                                                    today,
+                                                )}`}
+                                                style={{
+                                                    left: task.left,
+                                                    top:
+                                                        8 +
+                                                        task.lane *
+                                                            (BAR_HEIGHT + BAR_GAP),
+                                                    width: task.width,
+                                                    height: BAR_HEIGHT,
+                                                }}
+                                            >
+                                                <span className="truncate">
+                                                    {task.key} · {task.summary}
+                                                </span>
+                                            </a>
+                                        );
+                                    })}
                                     {tasks.length === 0 && (
                                         <div className="flex h-full items-center px-4 text-xs text-gray-400">
                                             表示範囲内のタスクはありません
@@ -279,20 +314,26 @@ function Legend({ label, className }: { label: string; className: string }) {
 function DayGrid({ days, today }: { days: Date[]; today: Date }) {
     return (
         <>
-            {days.map((day) => (
-                <div
-                    key={day.toISOString()}
-                    className={`absolute top-0 bottom-0 border-r border-gray-100 dark:border-gray-800 ${
-                        isSameDay(day, today)
-                            ? "bg-indigo-50/50 dark:bg-indigo-950/20"
-                            : ""
-                    }`}
-                    style={{
-                        left: daysBetween(days[0], day) * DAY_COLUMN_WIDTH,
-                        width: DAY_COLUMN_WIDTH,
-                    }}
-                />
-            ))}
+            {days.map((day) => {
+                const weekend = day.getDay() === 0 || day.getDay() === 6;
+                const isToday = isSameDay(day, today);
+                let bg = "";
+                if (isToday) {
+                    bg = "bg-indigo-50/50 dark:bg-indigo-950/20";
+                } else if (weekend) {
+                    bg = "bg-gray-50 dark:bg-gray-800/40";
+                }
+                return (
+                    <div
+                        key={day.toISOString()}
+                        className={`absolute top-0 bottom-0 border-r border-gray-100 dark:border-gray-800 ${bg}`}
+                        style={{
+                            left: daysBetween(days[0], day) * DAY_COLUMN_WIDTH,
+                            width: DAY_COLUMN_WIDTH,
+                        }}
+                    />
+                );
+            })}
         </>
     );
 }
@@ -358,8 +399,19 @@ function layoutTasks(
 }
 
 function getTaskClassName(task: VisibleTask, today: Date) {
-    if (task.dueDate && parseDate(task.dueDate) < today) {
-        return "bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600";
+    if (task.dueDate) {
+        const due = parseDate(task.dueDate);
+        if (due < today) {
+            // 期限超過: 日数に応じて濃度を変える
+            const overdueDays = daysBetween(due, today);
+            if (overdueDays >= 14) {
+                return "bg-red-400 dark:bg-red-700 border-red-600 dark:border-red-500 text-white";
+            }
+            if (overdueDays >= 7) {
+                return "bg-red-300 dark:bg-red-800 border-red-500 dark:border-red-600";
+            }
+            return "bg-red-200 dark:bg-red-800 border-red-400 dark:border-red-600";
+        }
     }
     if (task.status.toLowerCase().includes("progress")) {
         return "bg-indigo-200 dark:bg-indigo-800 border-indigo-400 dark:border-indigo-600";
