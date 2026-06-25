@@ -29,6 +29,31 @@ from jira_monitor import (
 # ヘルパー
 # ---------------------------------------------------------------------------
 
+def _calc_leadtime(issues, start, end):
+    """
+    与えられた issues 群から、period (start, end) 内に created されたものだけを
+    対象にリードタイム日数のリストと除外件数を返す。EPGPRD-314 用ヘルパ。
+
+    戻り値: (lead_times: list[int], excluded_old_count: int)
+    """
+    lead_times: list[int] = []
+    excluded_old = 0
+    for issue in issues:
+        created_str = issue["fields"].get("created")
+        resolution_str = issue["fields"].get("resolutiondate")
+        if not created_str:
+            continue
+        created = _parse_jira_dt(created_str)
+        if created < start:
+            excluded_old += 1
+            continue
+        resolved = _parse_jira_dt(resolution_str) if resolution_str else end
+        days = (resolved - created).days
+        if days >= 0:
+            lead_times.append(days)
+    return lead_times, excluded_old
+
+
 def _week_ranges(weeks: int = 26):
     """直近N週の(start, end)リストを返す（古い順）"""
     now = datetime.now(tz=JST)
@@ -133,12 +158,17 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
     for start, end, label in month_ranges:
         issues = _get_closed_in_range(client, conf, start, end)
         lead_times = []
+        excluded_old = 0
         for issue in issues:
             created_str = issue["fields"].get("created")
             resolution_str = issue["fields"].get("resolutiondate")
             if not created_str:
                 continue
             created = _parse_jira_dt(created_str)
+            # EPGPRD-314: 期間を跨いだ古いチケットはリードタイム集計から除外
+            if created < start:
+                excluded_old += 1
+                continue
             if resolution_str:
                 resolved = _parse_jira_dt(resolution_str)
             else:
@@ -153,6 +183,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "avg_days": avg,
             "median_days": med,
             "count": len(lead_times),
+            "excluded_old_count": excluded_old,
         })
 
     # 週次クローズ・対応中数
@@ -174,12 +205,17 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
     for start, end in week_ranges[-12:]:
         issues = _get_closed_in_range(client, conf, start, end)
         lead_times = []
+        excluded_old = 0
         for issue in issues:
             created_str = issue["fields"].get("created")
             resolution_str = issue["fields"].get("resolutiondate")
             if not created_str:
                 continue
             created = _parse_jira_dt(created_str)
+            # EPGPRD-314: 期間外に作成された古いチケットは除外
+            if created < start:
+                excluded_old += 1
+                continue
             if resolution_str:
                 resolved = _parse_jira_dt(resolution_str)
             else:
@@ -195,6 +231,7 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "avg_days": avg,
             "median_days": med,
             "count": len(lead_times),
+            "excluded_old_count": excluded_old,
         })
 
     # 現在の対応中数
@@ -255,6 +292,7 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
         issues = _get_closed_in_range(client, conf, start, end)
         # メンバーごとにリードタイムを集計
         member_lt: dict[str, list[int]] = {}
+        member_excluded: dict[str, int] = {}
         for issue in issues:
             name = _assignee_name(issue)
             created_str = issue["fields"].get("created")
@@ -262,6 +300,10 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
             if not created_str:
                 continue
             created = _parse_jira_dt(created_str)
+            # EPGPRD-314: 期間外作成チケットはリードタイム集計から除外
+            if created < start:
+                member_excluded[name] = member_excluded.get(name, 0) + 1
+                continue
             resolved = _parse_jira_dt(resolution_str) if resolution_str else end
             days = (resolved - created).days
             if days >= 0:
@@ -277,6 +319,7 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
                 "avg_days": round(sum(times) / len(times), 1),
                 "median_days": round(median(times), 1),
                 "count": len(times),
+                "excluded_old_count": member_excluded.get(name, 0),
             })
 
     return {"members": members}
@@ -467,12 +510,16 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
 
     # リードタイム計算
     lead_times = []
+    excluded_old = 0
     for issue in current_issues:
         created_str = issue["fields"].get("created")
         resolved_str = issue["fields"].get("resolutiondate")
         if not created_str or not resolved_str:
             continue
         created = _parse_jira_dt(created_str)
+        if created < half_start:
+            excluded_old += 1
+            continue
         resolved = _parse_jira_dt(resolved_str)
         days = (resolved - created).days
         if days >= 0:
@@ -512,6 +559,7 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
             "lead_time_median": lt_median,
             "lead_time_avg": lt_avg,
             "lead_time_sample_count": len(lead_times),
+            "lead_time_excluded_old_count": excluded_old,
         },
         "previous": {
             "total_closed": prev_total,

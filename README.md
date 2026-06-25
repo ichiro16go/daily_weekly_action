@@ -56,7 +56,7 @@ Jira API の `/rest/agile/1.0/board/{boardId}/issue` でチケットを取得し
 # セットアップ
 cp .env.example .env
 # .env に JIRA_BASE_URL / JIRA_EMAIL / JIRA_API_TOKEN / SLACK_WEBHOOK_URL を記入
-source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL WEEKLY_LABELS
+source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL WEEKLY_LABELS EXCLUDED_PROJECTS
 
 # 日報を標準出力で確認（Slack 送信なし）
 python3 jira_monitor.py --daily
@@ -94,6 +94,7 @@ GitHub PAT は **Fine-grained token** で `Actions: Read and write` 権限のみ
 - 完了系ステータス: `Done` / `完了` / `Close` / `Resolved` / `解決済み` / `リリース済み`
 - 週報の「今週」はカレンダー週ではなく、実行時点から遡った直近7日間
 - 日報で当日更新のない担当者は末尾にまとめて表示
+- ダッシュボードのリードタイム集計は、対象期間内に **created** されたチケットのみを母集団とする（期間を跨いで開いた古いチケットは件数には含めるが、平均/中央値の計算から除外）。透明性のため各エントリに `excluded_old_count` を含める
 
 ## セットアップ（初回）
 
@@ -113,8 +114,14 @@ GitHub リポジトリの **Settings → Secrets and variables → Actions → N
 ```bash
 cp .env.example .env
 # .env を編集して上記の値を記入
-source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL
+source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL INCLUDE_SUBTASKS
 ```
+
+### オプション環境変数
+
+| 環境変数 | 既定値 | 用途 |
+|---------|--------|------|
+| `INCLUDE_SUBTASKS` | `true` | ダッシュボード集計（起案数/クローズ数/リードタイム）にサブタスクを独立カウントするか。`false` で従来挙動。 |
 
 ---
 
