@@ -29,32 +29,47 @@ from jira_monitor import (
 # ヘルパー
 # ---------------------------------------------------------------------------
 
-def _calc_leadtime(issues, start, end):
-    """
-    与えられた issues 群から、period (start, end) 内に created されたものだけを
-    対象にリードタイム日数のリストと除外件数を返す。EPGPRD-314 用ヘルパ。
+def _is_subtask(issue) -> bool:
+    """issuetype.subtask が True ならサブタスク。fields に issuetype が無い場合 False。"""
+    issuetype = (issue.get("fields") or {}).get("issuetype") or {}
+    return bool(issuetype.get("subtask"))
 
-    戻り値: (lead_times: list[int], excluded_old_count: int)
+
+def _calc_leadtime(issues, end, *, exclude_subtasks: bool = True):
     """
-    lead_times: list[int] = []
-    excluded_old = 0
+    与えられた issues 群（指定期間にクローズされたもの）からリードタイム日数のリストを返す。
+
+    EPGPRD-320:
+      - 旧実装の「created < start を除外する」ロジックは廃止。
+        期間内クローズの全チケットを LT 計算対象にする（resolved - created）。
+        旧ロジックは weekly LT で「同一週内に作成かつクローズ」のみ残してしまい、
+        構造的に短い LT に偏る（0 日が大量に出る）原因だった。
+      - 日数は整数 floor ではなく秒単位を 1 日 = 86400s で割って小数 1 桁に丸める。
+        同日クローズが必ず 0 日になる問題を回避する。
+      - サブタスクはデフォルトで除外（即日完結のサブタスクが 0 日を量産するため）。
+
+    戻り値: list[float]（小数 1 桁、降順ソートしないので集計順は呼び元に依存）
+    """
+    lead_times: list[float] = []
     for issue in issues:
-        created_str = issue["fields"].get("created")
-        resolution_str = issue["fields"].get("resolutiondate")
+        if exclude_subtasks and _is_subtask(issue):
+            continue
+        fields = issue.get("fields") or {}
+        created_str = fields.get("created")
+        resolution_str = fields.get("resolutiondate")
         if not created_str:
             continue
         created = _parse_jira_dt(created_str)
-        if created < start:
-            excluded_old += 1
-            continue
         resolved = _parse_jira_dt(resolution_str) if resolution_str else end
-        days = (resolved - created).days
-        if days >= 0:
-            lead_times.append(days)
-    return lead_times, excluded_old
+        delta_seconds = (resolved - created).total_seconds()
+        if delta_seconds < 0:
+            # データ異常（resolved < created）はスキップ
+            continue
+        lead_times.append(round(delta_seconds / 86400.0, 1))
+    return lead_times
 
 
-def _calc_leadtime_stats(days_list: list[int]) -> dict:
+def _calc_leadtime_stats(days_list: list[float]) -> dict:
     """
     リードタイム日数リストから P95 を計算し、P95 超を外れ値として除外した
     avg/median/count/outlier_count/p95_threshold を返す。EPGPRD-313 用。
@@ -230,25 +245,8 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
     monthly_leadtime = []
     for start, end, label in month_ranges:
         issues = _get_closed_in_range(client, conf, start, end)
-        lead_times = []
-        excluded_old = 0
-        for issue in issues:
-            created_str = issue["fields"].get("created")
-            resolution_str = issue["fields"].get("resolutiondate")
-            if not created_str:
-                continue
-            created = _parse_jira_dt(created_str)
-            # EPGPRD-314: 期間を跨いだ古いチケットはリードタイム集計から除外
-            if created < start:
-                excluded_old += 1
-                continue
-            if resolution_str:
-                resolved = _parse_jira_dt(resolution_str)
-            else:
-                resolved = end
-            days = (resolved - created).days
-            if days >= 0:
-                lead_times.append(days)
+        # EPGPRD-320: 期間内クローズ全件を対象に計算（旧 created<start 除外は廃止）
+        lead_times = _calc_leadtime(issues, end)
         avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
         med = round(median(lead_times), 1) if lead_times else 0
         stats = _calc_leadtime_stats(lead_times)
@@ -259,7 +257,6 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "count": stats["count"],
             "outlier_count": stats["outlier_count"],
             "p95_threshold": stats["p95_threshold"],
-            "excluded_old_count": excluded_old,
             "raw_avg_days": avg,
             "raw_median_days": med,
             "raw_count": len(lead_times),
@@ -288,25 +285,8 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
     weekly_leadtime = []
     for start, end in week_ranges[-12:]:
         issues = _get_closed_in_range(client, conf, start, end)
-        lead_times = []
-        excluded_old = 0
-        for issue in issues:
-            created_str = issue["fields"].get("created")
-            resolution_str = issue["fields"].get("resolutiondate")
-            if not created_str:
-                continue
-            created = _parse_jira_dt(created_str)
-            # EPGPRD-314: 期間外に作成された古いチケットは除外
-            if created < start:
-                excluded_old += 1
-                continue
-            if resolution_str:
-                resolved = _parse_jira_dt(resolution_str)
-            else:
-                resolved = end
-            days = (resolved - created).days
-            if days >= 0:
-                lead_times.append(days)
+        # EPGPRD-320: 期間内クローズ全件を対象に計算（旧 created<start 除外は廃止）
+        lead_times = _calc_leadtime(issues, end)
         avg = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0
         med = round(median(lead_times), 1) if lead_times else 0
         stats = _calc_leadtime_stats(lead_times)
@@ -318,7 +298,6 @@ def build_team_summary(client: JiraClient, conf: cfg.Config) -> dict:
             "count": stats["count"],
             "outlier_count": stats["outlier_count"],
             "p95_threshold": stats["p95_threshold"],
-            "excluded_old_count": excluded_old,
             "raw_avg_days": avg,
             "raw_median_days": med,
             "raw_count": len(lead_times),
@@ -381,28 +360,16 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
 
     for start, end, label in month_ranges:
         issues = _get_closed_in_range(client, conf, start, end)
-        # メンバーごとにリードタイムを集計
-        member_lt: dict[str, list[int]] = {}
-        member_excluded: dict[str, int] = {}
+        # メンバー別にグルーピングしてから _calc_leadtime を適用（EPGPRD-320）
+        by_member: dict[str, list] = {}
         for issue in issues:
             name = _assignee_name(issue)
-            created_str = issue["fields"].get("created")
-            resolution_str = issue["fields"].get("resolutiondate")
-            if not created_str:
-                continue
-            created = _parse_jira_dt(created_str)
-            # EPGPRD-314: 期間外作成チケットはリードタイム集計から除外
-            if created < start:
-                member_excluded[name] = member_excluded.get(name, 0) + 1
-                continue
-            resolved = _parse_jira_dt(resolution_str) if resolution_str else end
-            days = (resolved - created).days
-            if days >= 0:
-                if name not in member_lt:
-                    member_lt[name] = []
-                member_lt[name].append(days)
+            by_member.setdefault(name, []).append(issue)
 
-        for name, times in member_lt.items():
+        for name, member_issues in by_member.items():
+            times = _calc_leadtime(member_issues, end)
+            if not times:
+                continue
             if name not in members:
                 members[name] = []
             stats = _calc_leadtime_stats(times)
@@ -413,7 +380,6 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
                 "count": stats["count"],
                 "outlier_count": stats["outlier_count"],
                 "p95_threshold": stats["p95_threshold"],
-                "excluded_old_count": member_excluded.get(name, 0),
                 "raw_count": len(times),
             })
 
@@ -610,7 +576,7 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     current_jql = f'{_resolved_jql(half_start, now)}{label_filter}'
     current_issues = client.search(
         conf.board_member_jql(current_jql),
-        ["created", "resolutiondate"],
+        ["created", "resolutiondate", "issuetype"],
         max_results=500,
     )
     half_total = len(current_issues)
@@ -619,22 +585,8 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     half_created_total = _get_created_in_range(client, conf, half_start, now)
     half_close_rate = _safe_rate(half_total, half_created_total)
 
-    # リードタイム計算
-    lead_times = []
-    excluded_old = 0
-    for issue in current_issues:
-        created_str = issue["fields"].get("created")
-        resolved_str = issue["fields"].get("resolutiondate")
-        if not created_str or not resolved_str:
-            continue
-        created = _parse_jira_dt(created_str)
-        if created < half_start:
-            excluded_old += 1
-            continue
-        resolved = _parse_jira_dt(resolved_str)
-        days = (resolved - created).days
-        if days >= 0:
-            lead_times.append(days)
+    # リードタイム計算（EPGPRD-320: 期間内クローズ全件、サブタスク除外）
+    lead_times = _calc_leadtime(current_issues, now)
 
     lt_stats = _calc_leadtime_stats(lead_times)
     lt_median = lt_stats["median_days"]
@@ -674,7 +626,6 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
             "lead_time_sample_count": lt_stats["count"],
             "lead_time_outlier_count": lt_stats["outlier_count"],
             "lead_time_p95_threshold": lt_stats["p95_threshold"],
-            "lead_time_excluded_old_count": excluded_old,
             "lead_time_raw_sample_count": len(lead_times),
         },
         "previous": {
