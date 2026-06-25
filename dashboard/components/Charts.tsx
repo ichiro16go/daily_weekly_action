@@ -83,6 +83,8 @@ export function BarChart({ labels, datasets, title, lineDatasets }: BarChartProp
         data={data}
         options={{
           responsive: true,
+          // デフォルト aspectRatio=2 だと縦長すぎるため 4 に（高さ約 1/2）
+          aspectRatio: 4,
           plugins: {
             title: { display: !!title, text: title, font: { size: 13, weight: "normal" }, color: "#6b7280" },
             legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
