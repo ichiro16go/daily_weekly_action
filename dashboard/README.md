@@ -98,13 +98,13 @@ pnpm dev
 3. **GitHub Actions を手動実行して動作確認**
    - Actions → "Dashboard 日次更新" → Run workflow
 
-## アクセス制限（Vercel Password Protection）
+## アクセス制限（Vercel Authentication）
 
-本番ダッシュボードは Vercel Password Protection により、チーム共通パスワードで保護します。Password Protection は Vercel 側の配信時認証なので、`next build` / SSG / 静的HTML生成には影響しません。
+本番ダッシュボードは Vercel の **Deployment Protection → Vercel Authentication** により、Vercel Team Member 単位の SSO 認証で保護します。配信時認証なので、`next build` / SSG / 静的HTML生成 ・ CI からの `vercel deploy` には影響しません。
 
-- 共有方法: TODO: 共有方法をチームで決定（例: 運用保守チームの ⚙ 共有ストレージ / 1Password / 部内Slack DM 担当者）
-- 認証フローのスクリーンショット位置: `../docs/images/vercel-password-protection-flow.png`（未添付。取得後に配置）
-- 設定手順と CI の bypass secret はルート README と `../docs/vercel-password-protection.md` を参照してください。
+- 設定手順・閲覧者の招待方法・動作確認は `../docs/vercel-authentication.md` を参照
+- 旧 Password Protection 案（EPGPRD-321）は本方式に統合してクローズ済み
+- 認証フローのスクリーンショット位置: `../docs/images/vercel-authentication-flow.png`（未添付。取得後に配置）
 
 ### 3. 手動でデータ更新
 
