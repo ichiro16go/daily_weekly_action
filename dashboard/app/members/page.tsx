@@ -26,7 +26,7 @@ export default function MembersPage() {
             {memberNames.map((name) => {
               const m = stats.members[name];
               const lastWeek = m?.weeks?.at(-1)?.closed ?? 0;
-              const overLimit = (m?.in_progress ?? 0) > (stats.wip_limit ?? 3);
+              const overLimit = (m?.in_progress ?? 0) > (stats.wip_limit ?? 5);
               return (
                 <tr key={name} className="border-t border-gray-100 dark:border-gray-800">
                   <td className="px-4 py-2 font-medium">{name}</td>

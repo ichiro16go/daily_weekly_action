@@ -71,7 +71,7 @@ class Config:
     slack_webhook_url: str | None
     projects: list[str] = field(default_factory=lambda: list(DEFAULT_PROJECTS))
     excluded_projects: list[str] = field(default_factory=lambda: ["SYOUGYO"])
-    wip_limit: int = 3  # 担当者あたり In PROGRESS 上限
+    wip_limit: int = 5  # 担当者あたり In PROGRESS 上限（EPGPRD-334: 3 → 5）
     weekly_labels: list[str] = field(default_factory=lambda: ["運用保守"])  # 週報で絞り込むラベル（OR）
     # 起動時に Jira から取得したラベルのうち、この正規表現にマッチするものを weekly_labels に追加する。
     # 既定: 「運用保守」+ 6桁数字（運用保守202401 など）の月次タグを全部拾う。
@@ -127,7 +127,7 @@ def load() -> Config:
     projects = [p.strip() for p in raw_projects.split(",") if p.strip()] or list(
         DEFAULT_PROJECTS
     )
-    wip_limit = int(os.environ.get("WIP_LIMIT", "3"))
+    wip_limit = int(os.environ.get("WIP_LIMIT", "5"))
     raw_labels = os.environ.get("WEEKLY_LABELS", os.environ.get("WEEKLY_LABEL", "運用保守"))
     weekly_labels = [l.strip() for l in raw_labels.split(",") if l.strip()]
 

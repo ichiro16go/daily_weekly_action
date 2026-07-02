@@ -166,7 +166,7 @@ cd dashboard && npm run build && npm run start
 | KPI 目標値 | `jira_monitor.py` の `_KPI_TARGET_*` 定数 |
 | ボードメンバー | `config.py` の `BOARD_MEMBER_BASE_JQL` |
 | ラベルフィルタ | `.env` の `WEEKLY_LABELS` |
-| WIP 上限 | `.env` の `WIP_LIMIT`（デフォルト: 3） |
+| WIP 上限 | `.env` の `WIP_LIMIT`（デフォルト: 5） |
 | データ取得範囲 | `fetch_dashboard_data.py` の `_week_ranges(26)` / `_month_ranges(6)` |
 
 ## ディレクトリ構成
