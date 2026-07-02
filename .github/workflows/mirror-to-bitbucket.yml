@@ -15,19 +15,20 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (mirror clone)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Push --mirror to Bitbucket
+      - name: Mirror clone and push to Bitbucket
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BB_EMAIL: ${{ secrets.BITBUCKET_EMAIL }}
           BB_API_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
           BB_REPO: epark-tech/report-and-dashboard
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+          # actions/checkout は working tree 付きのクローンなので `git fetch` で
+          # 現在チェックアウト中の branch を上書きできず失敗する。
+          # ここでは bare mirror clone を別ディレクトリで作って push する。
+          git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" repo.git
+          cd repo.git
           # Bitbucket Cloud は 2026-07-28 に App passwords を廃止。
           # 後継の API tokens は username=メールアドレス / password=トークン。
           # メアドに含まれる @ が URL のユーザー情報区切り文字と衝突するため、
