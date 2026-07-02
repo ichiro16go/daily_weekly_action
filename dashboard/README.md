@@ -98,13 +98,44 @@ pnpm dev
 3. **GitHub Actions を手動実行して動作確認**
    - Actions → "Dashboard 日次更新" → Run workflow
 
-## アクセス制限（Vercel Authentication）
+## アクセス制限（Shared Password）
 
-本番ダッシュボードは Vercel の **Deployment Protection → Vercel Authentication** により、Vercel Team Member 単位の SSO 認証で保護します。配信時認証なので、`next build` / SSG / 静的HTML生成 ・ CI からの `vercel deploy` には影響しません。
+本番ダッシュボードは **共通パスワード + HMAC 署名 Cookie** による軽量な認証で保護します。パスワードを知っているメンバーが `/login` で入力すると 7日間有効なセッション Cookie が発行されます。
 
-- 設定手順・閲覧者の招待方法・動作確認は `../docs/vercel-authentication.md` を参照
-- 旧 Password Protection 案（EPGPRD-321）は本方式に統合してクローズ済み
-- 認証フローのスクリーンショット位置: `../docs/images/vercel-authentication-flow.png`（未添付。取得後に配置）
+- 実装: `lib/auth.ts` / `proxy.ts` / `app/login/page.tsx` / `app/api/login/route.ts` / `app/api/logout/route.ts`
+- Vercel Hobby プランでは Deployment Protection が Production に効かないためアプリ層で実装（EPGPRD-328）
+- 追加依存ゼロ（Node 標準 `crypto` のみ）
+
+### セットアップ手順
+
+1. **環境変数を設定**（`.env.example` をコピー）
+
+   | 変数 | 生成/取得方法 | 必須 |
+   |------|--------------|------|
+   | `DASHBOARD_PASSWORD` | チームで共有するパスワード（強めに） | ✓ |
+   | `DASHBOARD_AUTH_SECRET` | `openssl rand -base64 32` — Cookie 署名鍵 | ✓ |
+
+2. **Vercel Project Settings → Environment Variables に上記を登録**（Production / Preview 両方、Sensitive 扱いで）
+
+3. **Vercel の Deployment Protection は OFF** にする（アプリ層で認証するため二重にする必要なし）
+
+### 動作確認
+
+```bash
+# ローカル
+cp .env.example .env.local && vim .env.local
+pnpm dev
+# http://localhost:3000 → /login へリダイレクト → パスワード入力 → ダッシュボード表示
+
+# 本番デプロイ後
+curl -sI https://daily-dashboard-flax.vercel.app/ | grep -iE '^(HTTP|location)'
+# 期待: HTTP/2 307 + location: /login?callbackUrl=...
+```
+
+### パスワード変更 / ローテーション
+
+- `DASHBOARD_PASSWORD` を Vercel env で更新 → 再デプロイ（既存 Cookie は署名秘密が同じなら有効のまま）
+- 全員を強制ログアウトしたい場合は **`DASHBOARD_AUTH_SECRET` も同時にローテーション**（新しい秘密で署名検証が失敗するため既存 Cookie は無効化される）
 
 ### 3. 手動でデータ更新
 

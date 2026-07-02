@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview" },
@@ -11,7 +12,7 @@ const NAV_ITEMS = [
   { href: "/cohort", label: "Cohort" },
 ];
 
-export function Nav() {
+export function Nav({ userMenu }: { userMenu?: ReactNode }) {
   const pathname = usePathname();
   return (
     <nav className="flex items-center gap-1 border-b border-gray-100 dark:border-gray-800 px-6 py-3 bg-white dark:bg-gray-900 sticky top-0 z-10">
@@ -29,6 +30,7 @@ export function Nav() {
           {item.label}
         </Link>
       ))}
+      {userMenu}
     </nav>
   );
 }
