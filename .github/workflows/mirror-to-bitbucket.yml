@@ -1,0 +1,35 @@
+name: Mirror to Bitbucket
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  delete:
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-to-bitbucket
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror clone and push to Bitbucket
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BB_API_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
+          BB_REPO: epark-tech/report-and-dashboard
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # actions/checkout は working tree 付きのクローンなので `git fetch` で
+          # 現在チェックアウト中の branch を上書きできず失敗する。
+          # ここでは bare mirror clone を別ディレクトリで作って push する。
+          git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GH_REPO}.git" repo.git
+          cd repo.git
+          # Bitbucket Cloud API tokens (App passwords の後継、2026-07-28 廃止対応):
+          # git 経由の認証は静的ユーザ名 `x-bitbucket-api-token-auth` を利用可能。
+          # 必要スコープ: read:repository:bitbucket, write:repository:bitbucket
+          git push --mirror \
+              "https://x-bitbucket-api-token-auth:${BB_API_TOKEN}@bitbucket.org/${BB_REPO}.git"
