@@ -22,11 +22,16 @@ jobs:
 
       - name: Push --mirror to Bitbucket
         env:
-          BB_USER: ${{ secrets.BITBUCKET_USERNAME }}
-          BB_APP_PASSWORD: ${{ secrets.BITBUCKET_APP_PASSWORD }}
+          BB_EMAIL: ${{ secrets.BITBUCKET_EMAIL }}
+          BB_API_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
           BB_REPO: epark-tech/report-and-dashboard
         run: |
           set -euo pipefail
           git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
-          git remote add bitbucket "https://${BB_USER}:${BB_APP_PASSWORD}@bitbucket.org/${BB_REPO}.git"
-          git push --mirror bitbucket
+          # Bitbucket Cloud は 2026-07-28 に App passwords を廃止。
+          # 後継の API tokens は username=メールアドレス / password=トークン。
+          # メアドに含まれる @ が URL のユーザー情報区切り文字と衝突するため、
+          # http.extraheader で Basic 認証ヘッダを渡す。
+          BASIC=$(printf '%s:%s' "$BB_EMAIL" "$BB_API_TOKEN" | base64 -w0)
+          git -c http.extraheader="Authorization: Basic ${BASIC}" \
+              push --mirror "https://bitbucket.org/${BB_REPO}.git"
