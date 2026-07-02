@@ -139,6 +139,27 @@ export interface KpiData {
   };
 }
 
+export interface WeeklyClosedTicket {
+  key: string;
+  summary: string;
+  assignee: string;
+  issuetype: string;
+  is_subtask: boolean;
+  resolved_at: string | null;
+  lead_time_days: number | null;
+  url: string;
+}
+
+export interface WeeklyClosedTickets {
+  weeks: {
+    week_start: string;
+    week_end: string;
+    label: string;
+    count: number;
+    tickets: WeeklyClosedTicket[];
+  }[];
+}
+
 export interface LabelCohort {
   cohorts: {
     label: string;
@@ -161,4 +182,5 @@ export const getWipStatus = () => load<WipStatus>("wip_status.json");
 export const getCalendarData = () => load<CalendarData>("calendar.json");
 export const getKpi = () => load<KpiData>("kpi.json");
 export const getLabelCohort = () => load<LabelCohort>("label_cohort.json");
+export const getWeeklyClosedTickets = () => load<WeeklyClosedTickets>("weekly_closed_tickets.json");
 export const getMeta = () => load<Meta>("meta.json");
