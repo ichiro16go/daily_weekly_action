@@ -1,0 +1,32 @@
+name: Mirror to Bitbucket
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["**"]
+  delete:
+  workflow_dispatch:
+
+concurrency:
+  group: mirror-to-bitbucket
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (mirror clone)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push --mirror to Bitbucket
+        env:
+          BB_USER: ${{ secrets.BITBUCKET_USERNAME }}
+          BB_APP_PASSWORD: ${{ secrets.BITBUCKET_APP_PASSWORD }}
+          BB_REPO: epark-tech/report-and-dashboard
+        run: |
+          set -euo pipefail
+          git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+          git remote add bitbucket "https://${BB_USER}:${BB_APP_PASSWORD}@bitbucket.org/${BB_REPO}.git"
+          git push --mirror bitbucket
