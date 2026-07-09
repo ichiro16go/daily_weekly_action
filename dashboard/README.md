@@ -4,21 +4,7 @@ Jira のデータを日次で集計し、チームのパフォーマンスを可
 
 ## アーキテクチャ
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  GitHub Actions (毎日 JST 09:00 / 手動実行)                  │
-│                                                              │
-│  1. fetch_dashboard_data.py (Python)                         │
-│     └─ Jira REST API → dashboard/data/*.json (8ファイル)     │
-│                                                              │
-│  2. next build (SSG)                                         │
-│     └─ JSON読込 → 静的HTML生成                               │
-│                                                              │
-│  3. Vercel にデプロイ                                         │
-└─────────────────────────────────────────────────────────────┘
-
-ブラウザ → Vercel (静的HTML) → サーバー不要
-```
+![Dashboard Architecture](../docs/diagrams/architecture.drawio.svg)
 
 **技術スタック:**
 - **フロント:** Next.js 16 (App Router, SSG) + React 19 + Chart.js + TailwindCSS 4
