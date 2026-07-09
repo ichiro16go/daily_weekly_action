@@ -9,6 +9,24 @@ Jira のチケットを起点に、EPG 運用保守の日報・週報 Slack 通�
 | 機能 | スクリプト | ワークフロー |
 |------|-----------|-------------|
 | Jira日報・週報 Slack通知 | `jira_monitor.py` | `jira-notify.yml` |
+| ダッシュボード データ更新 & デプロイ | `fetch_dashboard_data.py` | `update-dashboard.yml` |
+
+---
+
+## アーキテクチャ
+
+![Dashboard Architecture](docs/diagrams/architecture.drawio.svg)
+
+| レイヤー | コンポーネント | 役割 |
+|---------|--------------|------|
+| **外部** | Jira REST API | チケットデータの取得元 |
+| **CI/CD** | GitHub Actions (`update-dashboard.yml`) | 毎朝09:00 JST に自動実行。Jira → JSON 生成 → Vercel デプロイ |
+| **CI/CD** | GitHub Actions (`jira-notify.yml`) | workflow_dispatch で週報 Slack 通知 |
+| **データ** | `dashboard/data/*.json` | SSG ビルド時に読み込まれる静的 JSON |
+| **App** | Next.js on Vercel | `proxy.ts` による HMAC 認証 + 6ページのダッシュボード |
+| **通知** | Slack Webhook | 週報の自動送信先 |
+
+> **編集可能な図**: `docs/diagrams/architecture.drawio`（VS Code Draw.io 拡張で開けます）
 
 ---
 
@@ -142,12 +160,24 @@ source .env && export JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN SLACK_WEBHOOK_URL 
 ├── .env                            # 実際の値（.gitignore 済み・コミット不可）
 ├── config.py                       # 環境変数の読み込み・JQL定義
 ├── jira_monitor.py                 # 日報・週報メインスクリプト
+├── fetch_dashboard_data.py         # Jira → dashboard/data/*.json 生成
 ├── notifiers/
 │   ├── __init__.py
 │   └── slack.py                    # Slack Webhook 通知
+├── dashboard/                      # Next.js ダッシュボード (Vercel)
+│   ├── app/                        # ページ (/, /members, /ranking, /calendar, /closed, /cohort)
+│   ├── lib/
+│   │   ├── auth.ts                 # HMAC 認証ユーティリティ
+│   │   └── data.ts                 # JSON ファイル読み込み
+│   ├── proxy.ts                    # Next.js 16 Proxy (認証ゲート)
+│   └── data/                       # fetch_dashboard_data.py の出力先 (*.json)
+├── docs/
+│   └── diagrams/
+│       └── architecture.drawio    # アーキテクチャ図（編集可能）
 └── .github/
     └── workflows/
-        └── jira-notify.yml         # 日報・週報 (workflow_dispatch)
+        ├── jira-notify.yml         # 日報・週報 (workflow_dispatch)
+        └── update-dashboard.yml   # ダッシュボード更新 & デプロイ (cron)
 ```
 
 ## 注意事項

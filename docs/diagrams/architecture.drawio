@@ -1,0 +1,118 @@
+<mxfile host="app.diagrams.net" generator="diagram-forge">
+  <diagram id="arch-001" name="Architecture">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="820" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ── External: Jira REST API ── -->
+        <mxCell id="jira" value="Jira REST API&#xa;(epark-tech.atlassian.net)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="30" width="240" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ── GitHub Actions background ── -->
+        <mxCell id="gha-bg" value="&#x2699;&#xfe0f;  GitHub Actions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;align=left;spacingLeft=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="155" width="690" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- fetch_dashboard_data.py -->
+        <mxCell id="fetch-py" value="fetch_dashboard_data.py&#xa;Jira → JSON 変換・出力" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="185" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- jira_monitor.py -->
+        <mxCell id="jira-mon" value="jira_monitor.py&#xa;日報・週報 Slack 通知" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="470" y="185" width="240" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ── dashboard/data/*.json ── -->
+        <mxCell id="json-files" value="dashboard/data/*.json&#xa;─────────────────&#xa;team_summary / member_stats / kpi&#xa;wip_status / calendar / stale_ranking&#xa;overdue_ranking / label_cohort&#xa;weekly_closed_tickets ..." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="305" width="240" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ── Slack Webhook ── -->
+        <mxCell id="slack" value="Slack Webhook&#xa;(週報通知)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="470" y="305" width="210" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ── Vercel / Next.js background ── -->
+        <mxCell id="vercel-bg" value="&#x25b2;  Next.js App (Vercel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#333333;fontSize=13;fontStyle=1;verticalAlign=top;spacingTop=8;align=left;spacingLeft=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="490" width="650" height="270" as="geometry" />
+        </mxCell>
+
+        <!-- proxy.ts -->
+        <mxCell id="proxy" value="proxy.ts&#xa;HMAC 共有パスワード認証" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="535" width="215" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- lib/data.ts -->
+        <mxCell id="data-lib" value="lib/data.ts&#xa;JSON ファイル読み込み" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="615" width="215" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Pages -->
+        <mxCell id="pages" value="Pages&#xa;─────────────────────────&#xa;/　　　Overview（KPI · WIP · チャート）&#xa;/members　　メンバー別統計&#xa;/ranking　　放置 · 期限超過チケット&#xa;/calendar　　タスクカレンダー&#xa;/closed　　週次クローズ一覧&#xa;/cohort　　ラベルコホート分析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#aaaaaa;fontSize=11;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="330" y="510" width="355" height="225" as="geometry" />
+        </mxCell>
+
+        <!-- ── Browser ── -->
+        <mxCell id="browser" value="ブラウザ（チームメンバー）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="790" width="270" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ── Edges ── -->
+
+        <!-- fetch-py → jira -->
+        <mxCell id="e1" value="fetch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.15;entryY=1;entryDx=0;entryDy=0;" edge="1" source="fetch-py" target="jira" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- jira-mon → jira -->
+        <mxCell id="e2" value="fetch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;exitX=0.3;exitY=0;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" edge="1" source="jira-mon" target="jira" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- fetch-py → json-files -->
+        <mxCell id="e3" value="JSON 出力" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" edge="1" source="fetch-py" target="json-files" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- jira-mon → slack -->
+        <mxCell id="e4" value="通知" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" edge="1" source="jira-mon" target="slack" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- json-files → data-lib (SSG build) -->
+        <mxCell id="e5" value="readFileSync&#xa;(SSG build)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" edge="1" source="json-files" target="data-lib" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- data-lib → pages -->
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" source="data-lib" target="pages" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- browser → proxy -->
+        <mxCell id="e7" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" edge="1" source="browser" target="proxy" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- proxy → pages -->
+        <mxCell id="e8" value="認証 OK" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;" edge="1" source="proxy" target="pages" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- GHA deploys Vercel (dashed) -->
+        <mxCell id="e9" value="vercel deploy&#xa;(cron 09:00 JST)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="fetch-py" target="vercel-bg" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="200" y="460" />
+              <mxPoint x="385" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
