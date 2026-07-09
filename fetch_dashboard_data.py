@@ -181,12 +181,17 @@ def _label_cohort_labels(conf: "cfg.Config | None" = None, months: int = 18) -> 
     return labels
 
 
-def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end):
+def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end, expand: str | None = None):
     """指定期間にクローズされたチケットを返す（resolved フィールドベース）"""
     jql = conf.board_member_jql(
         f'{_resolved_jql(start, end)}{_label_filter(conf)}'
     )
-    return client.search(jql, ["summary", "assignee", "created", "resolutiondate", "issuetype"], max_results=500)
+    return client.search(
+        jql,
+        ["summary", "assignee", "created", "resolutiondate", "issuetype"],
+        max_results=500,
+        expand=expand,
+    )
 
 
 def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
@@ -230,6 +235,75 @@ def _assignee_name(issue) -> str:
     if assignee:
         return assignee.get("displayName", "不明")
     return "未アサイン"
+
+
+def _assignee_name_at_close_with_source(issue: dict) -> tuple[str, str]:
+    """クローズ時点の担当者を changelog から逆算し、由来も返す。"""
+    fields = issue.get("fields") or {}
+    resolved_str = fields.get("resolutiondate")
+    if not resolved_str:
+        return _assignee_name(issue), "current"
+
+    try:
+        resolved_at = _parse_jira_dt(resolved_str)
+    except Exception:
+        return _assignee_name(issue), "current"
+
+    assignee = _assignee_name(issue)
+    source = "current"
+    histories = sorted(
+        (issue.get("changelog") or {}).get("histories", []),
+        key=lambda h: h.get("created", ""),
+        reverse=True,
+    )
+    for history in histories:
+        created_str = history.get("created")
+        if not created_str:
+            continue
+        try:
+            history_dt = _parse_jira_dt(created_str)
+        except Exception:
+            continue
+        if history_dt < resolved_at:
+            continue
+        for item in history.get("items") or []:
+            if item.get("field") != "assignee":
+                continue
+            to_name = item.get("toString") or "未アサイン"
+            from_name = item.get("fromString") or "未アサイン"
+            if assignee == to_name:
+                assignee = from_name
+                source = "changelog"
+            elif assignee == "未アサイン" and from_name != "未アサイン":
+                assignee = from_name
+                source = "changelog"
+    return assignee or "未アサイン", source
+
+
+def _assignee_name_at_close(issue: dict) -> str:
+    name, _ = _assignee_name_at_close_with_source(issue)
+    return name
+
+
+def _closed_issues_with_history(client: JiraClient, conf: cfg.Config, start, end) -> list[dict]:
+    """クローズ済みチケットを changelog 付きで返す。"""
+    issues = _get_closed_in_range(client, conf, start, end, expand="changelog")
+    if all("changelog" in issue for issue in issues):
+        return issues
+
+    detailed_issues = []
+    for issue in issues:
+        if "changelog" in issue:
+            detailed_issues.append(issue)
+            continue
+        detailed_issues.append(
+            client.get_issue(
+                issue["key"],
+                fields=["summary", "assignee", "created", "resolutiondate", "issuetype"],
+                expand="changelog",
+            )
+        )
+    return detailed_issues
 
 
 # ---------------------------------------------------------------------------
@@ -325,16 +399,16 @@ def build_member_stats(client: JiraClient, conf: cfg.Config) -> dict:
 
     # 直近8週の完了を集計
     for start, end in week_ranges_list[-8:]:
-        issues = _get_closed_in_range(client, conf, start, end)
+        issues = _closed_issues_with_history(client, conf, start, end)
         week_label = start.strftime("%m/%d")
         for issue in issues:
-            name = _assignee_name(issue)
+            name = _assignee_name_at_close(issue)
             if name not in members:
                 members[name] = {"weeks": [], "in_progress": 0}
         # 今週分の完了数をカウント
         week_count: dict[str, int] = {}
         for issue in issues:
-            name = _assignee_name(issue)
+            name = _assignee_name_at_close(issue)
             week_count[name] = week_count.get(name, 0) + 1
         for name in members:
             members[name]["weeks"].append({
@@ -359,11 +433,11 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
     members: dict[str, list] = {}
 
     for start, end, label in month_ranges:
-        issues = _get_closed_in_range(client, conf, start, end)
+        issues = _closed_issues_with_history(client, conf, start, end)
         # メンバー別にグルーピングしてから _calc_leadtime を適用（EPGPRD-320）
         by_member: dict[str, list] = {}
         for issue in issues:
-            name = _assignee_name(issue)
+            name = _assignee_name_at_close(issue)
             by_member.setdefault(name, []).append(issue)
 
         for name, member_issues in by_member.items():
@@ -698,8 +772,9 @@ def build_weekly_closed_tickets(client: JiraClient, conf: cfg.Config) -> dict:
     week_ranges = _week_ranges(4)  # 直近4週分を保持
     weeks: list[dict] = []
     for start, end in week_ranges:
-        issues = _get_closed_in_range(client, conf, start, end)
+        issues = _closed_issues_with_history(client, conf, start, end)
         tickets = []
+        source_counts = {"changelog": 0, "current": 0}
         for issue in issues:
             fields = issue.get("fields") or {}
             created_str = fields.get("created")
@@ -716,10 +791,13 @@ def build_weekly_closed_tickets(client: JiraClient, conf: cfg.Config) -> dict:
                     resolved_date = _parse_jira_dt(resolved_str).strftime("%Y-%m-%d %H:%M")
                 except Exception:
                     resolved_date = resolved_str[:16]
+            assignee, source = _assignee_name_at_close_with_source(issue)
+            source_counts[source] = source_counts.get(source, 0) + 1
             tickets.append({
                 "key": issue["key"],
                 "summary": fields.get("summary", ""),
-                "assignee": _assignee_name(issue),
+                "assignee": assignee,
+                "assignee_source": source,
                 "issuetype": issuetype,
                 "is_subtask": _is_subtask(issue),
                 "resolved_at": resolved_date,
@@ -733,6 +811,7 @@ def build_weekly_closed_tickets(client: JiraClient, conf: cfg.Config) -> dict:
             "week_end": end.strftime("%Y-%m-%d"),
             "label": start.strftime("%m/%d"),
             "count": len(tickets),
+            "assignee_source_counts": source_counts,
             "tickets": tickets,
         })
     # 新しい週が先頭に来るように反転

@@ -194,6 +194,7 @@ class JiraClient:
         jql: str,
         fields: list[str],
         max_results: int,
+        expand: str | None = None,
         next_page_token: str | None = None,
     ) -> dict:
         # JQLが長い場合にGETのURL長制限で接続リセットされるためPOSTを使う
@@ -202,11 +203,19 @@ class JiraClient:
             "fields": fields,
             "maxResults": max_results,
         }
+        if expand:
+            payload["expand"] = expand
         if next_page_token:
             payload["nextPageToken"] = next_page_token
         return self._request_json("POST", "/rest/api/3/search/jql", payload=payload)
 
-    def search(self, jql: str, fields: list[str], max_results: int = 100) -> list[dict]:
+    def search(
+        self,
+        jql: str,
+        fields: list[str],
+        max_results: int = 100,
+        expand: str | None = None,
+    ) -> list[dict]:
         """JQL で Jira を検索し、全件をページネーションして返す"""
         results = []
         next_page_token = None
@@ -216,7 +225,7 @@ class JiraClient:
                 break
 
             data = self._search_once(
-                jql, fields, page_size, next_page_token=next_page_token
+                jql, fields, page_size, expand=expand, next_page_token=next_page_token
             )
             page_issues = data.get("issues", [])
             results.extend(page_issues)
@@ -230,6 +239,19 @@ class JiraClient:
             if not next_page_token or not page_issues:
                 break
         return results
+
+    def get_issue(
+        self,
+        key: str,
+        fields: list[str] | None = None,
+        expand: str | None = None,
+    ) -> dict:
+        query: dict[str, str] = {}
+        if fields:
+            query["fields"] = ",".join(fields)
+        if expand:
+            query["expand"] = expand
+        return self._request_json("GET", f"/rest/api/3/issue/{key}", query=query or None)
 
     def count(self, jql: str) -> int:
         payload = {"jql": jql}
@@ -375,6 +397,78 @@ def _resolved_jql(start: datetime, end: datetime) -> str:
 
 def _assignee_name(issue: dict) -> str:
     return (issue["fields"].get("assignee") or {}).get("displayName", "未アサイン")
+
+
+def _assignee_name_at_close(issue: dict) -> str:
+    """クローズ時点の担当者を changelog から逆算する。"""
+    fields = issue.get("fields") or {}
+    resolved_str = fields.get("resolutiondate")
+    if not resolved_str:
+        return _assignee_name(issue)
+
+    try:
+        resolved_at = _parse_jira_dt(resolved_str)
+    except Exception:
+        return _assignee_name(issue)
+
+    assignee = _assignee_name(issue)
+    histories = sorted(
+        (issue.get("changelog") or {}).get("histories", []),
+        key=lambda h: h.get("created", ""),
+        reverse=True,
+    )
+    for history in histories:
+        created_str = history.get("created")
+        if not created_str:
+            continue
+        try:
+            history_dt = _parse_jira_dt(created_str)
+        except Exception:
+            continue
+        if history_dt < resolved_at:
+            continue
+        for item in history.get("items") or []:
+            if item.get("field") != "assignee":
+                continue
+            to_name = item.get("toString") or "未アサイン"
+            from_name = item.get("fromString") or "未アサイン"
+            if assignee == to_name:
+                assignee = from_name
+            elif assignee == "未アサイン" and from_name != "未アサイン":
+                assignee = from_name
+    return assignee or "未アサイン"
+
+
+def _closed_issues_with_history(
+    client: JiraClient,
+    conf: cfg.Config,
+    start,
+    end,
+    extra_filter: str = "",
+) -> list[dict]:
+    """クローズ済みチケットを changelog 付きで返す。"""
+    issues = client.search(
+        conf.board_member_jql(f"{_resolved_jql(start, end)}{extra_filter}"),
+        ["summary", "assignee", "created", "resolutiondate", "issuetype"],
+        max_results=500,
+        expand="changelog",
+    )
+    if all("changelog" in issue for issue in issues):
+        return issues
+
+    detailed_issues = []
+    for issue in issues:
+        if "changelog" in issue:
+            detailed_issues.append(issue)
+            continue
+        detailed_issues.append(
+            client.get_issue(
+                issue["key"],
+                fields=["summary", "assignee", "created", "resolutiondate", "issuetype"],
+                expand="changelog",
+            )
+        )
+    return detailed_issues
 
 
 def _summary(issue: dict, limit: int = 60) -> str:
@@ -668,11 +762,7 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         ["assignee"],
         max_results=500,
     )
-    closed_week_issues = client.search(
-        conf.board_member_jql(_and_label(resolved_period_jql)),
-        ["assignee"],
-        max_results=500,
-    )
+    closed_week_issues = _closed_issues_with_history(client, conf, period_start, period_end, f" AND {label_filter}" if label_filter else "")
     overdue_issues = client.search(
         conf.board_jql(_and_label("duedate < now()"), order_by="duedate ASC"),
         ["summary", "assignee", "duedate"],
@@ -699,7 +789,7 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
             )
         assignee_map[name].in_progress += 1
     for issue in closed_week_issues:
-        name = _assignee_name(issue)
+        name = _assignee_name_at_close(issue)
         if name not in assignee_map:
             assignee_map[name] = AssigneeStat(
                 name=name, closed_this_week=0, in_progress=0

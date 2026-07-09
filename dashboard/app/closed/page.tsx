@@ -1,5 +1,6 @@
-import { getWeeklyClosedTickets } from "@/lib/data";
+import { getWeeklyClosedTickets, getTeamSummary, getMemberStats } from "@/lib/data";
 import Link from "next/link";
+import { ClosedCharts } from "./ClosedCharts";
 
 export default async function ClosedThisWeekPage({
   searchParams,
@@ -8,6 +9,8 @@ export default async function ClosedThisWeekPage({
 }) {
   const params = (await searchParams) ?? {};
   const data = getWeeklyClosedTickets();
+  const team = getTeamSummary();
+  const memberStats = getMemberStats();
   const weeks = Array.isArray(data.weeks) ? data.weeks : [];
 
   if (weeks.length === 0) {
@@ -26,11 +29,21 @@ export default async function ClosedThisWeekPage({
 
   return (
     <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">✅ 週次クローズ</h1>
+
+      {/* グラフ */}
+      <ClosedCharts team={team} memberStats={memberStats} />
+
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">✅ 週次クローズ一覧</h1>
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">チケット一覧</h2>
         <span className="text-sm text-gray-500">
           {selected.week_start} 〜 {selected.week_end}（{selected.count} 件）
         </span>
+        {selected.assignee_source_counts && (
+          <span className="text-xs text-gray-400">
+            assignee: changelog {selected.assignee_source_counts.changelog} / current {selected.assignee_source_counts.current}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -59,7 +72,8 @@ export default async function ClosedThisWeekPage({
             <tr>
               <th className="px-4 py-2 text-left w-8">#</th>
               <th className="px-4 py-2 text-left">チケット</th>
-              <th className="px-4 py-2 text-left">担当</th>
+              <th className="px-4 py-2 text-left">担当(クローズ時)</th>
+              <th className="px-4 py-2 text-left">由来</th>
               <th className="px-4 py-2 text-left">タイプ</th>
               <th className="px-4 py-2 text-left">完了日時</th>
               <th className="px-4 py-2 text-right">LT</th>
@@ -81,6 +95,9 @@ export default async function ClosedThisWeekPage({
                   <span className="ml-2">{t.summary}</span>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap">{t.assignee}</td>
+                <td className="px-4 py-2 whitespace-nowrap text-gray-500">
+                  {t.assignee_source === "changelog" ? "changelog" : "current"}
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-gray-500">
                   {t.issuetype}
                   {t.is_subtask && (
@@ -111,7 +128,7 @@ export default async function ClosedThisWeekPage({
             ))}
             {selected.tickets.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                   この週のクローズはありません
                 </td>
               </tr>

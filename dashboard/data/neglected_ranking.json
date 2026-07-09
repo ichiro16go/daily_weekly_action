@@ -5,7 +5,7 @@
     "assignee": "加川 頼人",
     "status": "In PROGRESS",
     "created": "2020-04-20",
-    "days_since_created": 2270,
+    "days_since_created": 2271,
     "url": "https://epark-tech.atlassian.net/browse/FASPACLOUD-1080"
   },
   {
@@ -59,7 +59,7 @@
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
     "created": "2022-08-25",
-    "days_since_created": 1413,
+    "days_since_created": 1414,
     "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5957"
   },
   {
@@ -131,7 +131,7 @@
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
     "created": "2022-09-08",
-    "days_since_created": 1399,
+    "days_since_created": 1400,
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-213"
   },
   {
@@ -140,7 +140,7 @@
     "assignee": "鈴鹿 千津子",
     "status": "ペンディング",
     "created": "2022-09-08",
-    "days_since_created": 1399,
+    "days_since_created": 1400,
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-215"
   },
   {
@@ -162,21 +162,21 @@
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-242"
   },
   {
-    "key": "JPREQ-259",
-    "summary": "【不具合】管理画面の会員検索における受付情報の重複",
-    "assignee": "野口 直也",
-    "status": "再オープン",
-    "created": "2022-10-14",
-    "days_since_created": 1363,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-259"
-  },
-  {
     "key": "JPREQ-265",
     "summary": "【不具合】メール配信の年齢絞り込みで1つの年齢のみに配信することが出来ない",
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
     "created": "2022-10-19",
-    "days_since_created": 1358,
+    "days_since_created": 1359,
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-265"
+  },
+  {
+    "key": "JPREQ-277",
+    "summary": "【不具合】予約シナリオに電話呼出の同じ予約カテゴリを設定すると受付が出来なくなる",
+    "assignee": "鈴鹿 千津子",
+    "status": "再オープン",
+    "created": "2022-11-09",
+    "days_since_created": 1337,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-277"
   }
 ]

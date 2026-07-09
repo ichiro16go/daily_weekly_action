@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { getCalendarData } from "@/lib/data";
+import { getCalendarData, getWeeklyClosedTickets } from "@/lib/data";
 import { CalendarView } from "./CalendarView";
 
 export const metadata: Metadata = {
   title: "Calendar | 運用保守チーム Dashboard",
-  description: "担当者ごとの未完了チケットを週次・月次で確認できるチームカレンダー",
+  description: "担当者ごとの未完了チケットを月次で確認できるチームカレンダー",
 };
 
 export default function CalendarPage() {
   const calendar = getCalendarData();
+  const closedTickets = getWeeklyClosedTickets();
 
   return (
     <div className="space-y-8">
@@ -16,7 +17,7 @@ export default function CalendarPage() {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">🗓️ チームカレンダー</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            メンバーごとの未完了チケットを週次・月次のガント風ビューで確認できます。
+            メンバーごとの未完了チケットを月次のガント風ビューで確認できます。
           </p>
         </div>
         {calendar.generated_at && (
@@ -26,7 +27,7 @@ export default function CalendarPage() {
         )}
       </div>
 
-      <CalendarView data={calendar} />
+      <CalendarView data={calendar} closedTickets={closedTickets} />
     </div>
   );
 }

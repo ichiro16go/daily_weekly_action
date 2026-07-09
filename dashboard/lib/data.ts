@@ -143,6 +143,7 @@ export interface WeeklyClosedTicket {
   key: string;
   summary: string;
   assignee: string;
+  assignee_source?: "changelog" | "current";
   issuetype: string;
   is_subtask: boolean;
   resolved_at: string | null;
@@ -156,6 +157,7 @@ export interface WeeklyClosedTickets {
     week_end: string;
     label: string;
     count: number;
+    assignee_source_counts?: { changelog: number; current: number };
     tickets: WeeklyClosedTicket[];
   }[];
 }

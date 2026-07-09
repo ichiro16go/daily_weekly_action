@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CalendarData } from "@/lib/data";
+import type { CalendarData, WeeklyClosedTickets } from "@/lib/data";
 
 const MEMBER_COLUMN_WIDTH = 176;
 const DAY_COLUMN_WIDTH = 52;
@@ -22,12 +22,27 @@ type VisibleTask = CalendarData["members"][string]["tasks"][number] & {
     width: number;
 };
 
-export function CalendarView({ data }: { data: CalendarData }) {
+type ClosedTicketRaw = WeeklyClosedTickets["weeks"][number]["tickets"][number];
+type ClosedVisibleTask = ClosedTicketRaw & {
+    resolvedDate: Date;
+    lane: number;
+    left: number;
+    width: number;
+};
+
+export function CalendarView({
+    data,
+    closedTickets,
+}: {
+    data: CalendarData;
+    closedTickets?: WeeklyClosedTickets;
+}) {
     const initialDate = useMemo(
         () => (data.generated_at ? new Date(data.generated_at) : new Date()),
         [data.generated_at],
     );
     const [anchorDate, setAnchorDate] = useState(initialDate);
+    const [showCompleted, setShowCompleted] = useState(false);
 
     const today = useMemo(
         () =>
@@ -45,6 +60,26 @@ export function CalendarView({ data }: { data: CalendarData }) {
     );
     const timelineWidth = days.length * DAY_COLUMN_WIDTH;
     const members = Object.entries(data.members ?? {});
+
+    // 当月の完了チケットをメンバー別にグループ化
+    const closedByMember = useMemo<Record<string, ClosedTicketRaw[]>>(() => {
+        if (!closedTickets?.weeks) return {};
+        const result: Record<string, ClosedTicketRaw[]> = {};
+        for (const week of closedTickets.weeks) {
+            for (const ticket of week.tickets) {
+                if (!ticket.resolved_at) continue;
+                const d = new Date(ticket.resolved_at);
+                if (
+                    d.getFullYear() !== anchorDate.getFullYear() ||
+                    d.getMonth() !== anchorDate.getMonth()
+                )
+                    continue;
+                const name = ticket.assignee ?? "未アサイン";
+                (result[name] ??= []).push(ticket);
+            }
+        }
+        return result;
+    }, [closedTickets, anchorDate]);
 
     return (
         <section className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm">
@@ -68,6 +103,32 @@ export function CalendarView({ data }: { data: CalendarData }) {
                             →
                         </NavButton>
                     </div>
+                    {/* 完了タスク表示トグル */}
+                    <label className="flex cursor-pointer items-center gap-2 select-none">
+                        <div className="relative">
+                            <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={showCompleted}
+                                onChange={(e) => setShowCompleted(e.target.checked)}
+                            />
+                            <div
+                                className={`h-5 w-9 rounded-full transition-colors ${
+                                    showCompleted
+                                        ? "bg-teal-500"
+                                        : "bg-gray-300 dark:bg-gray-600"
+                                }`}
+                            />
+                            <div
+                                className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                                    showCompleted ? "translate-x-4" : "translate-x-0"
+                                }`}
+                            />
+                        </div>
+                        <span className="text-xs text-gray-600 dark:text-gray-300">
+                            完了タスクを表示
+                        </span>
+                    </label>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -98,6 +159,12 @@ export function CalendarView({ data }: { data: CalendarData }) {
                         label="開始/終了日 未設定"
                         className="bg-amber-50 dark:bg-amber-950 border-amber-400 dark:border-amber-600 border-dashed"
                     />
+                    {showCompleted && (
+                        <Legend
+                            label="完了"
+                            className="bg-teal-100 dark:bg-teal-900 border-teal-400 dark:border-teal-600"
+                        />
+                    )}
                     <span>
                         終了日は 終了日(WBSGantt) を参照（未設定時は期限を使用）
                     </span>
@@ -145,14 +212,33 @@ export function CalendarView({ data }: { data: CalendarData }) {
                             range.end,
                             today,
                         );
-                        const lanes = Math.max(
+                        const openLanes = Math.max(
                             tasks.reduce(
                                 (max, task) => Math.max(max, task.lane + 1),
                                 0,
                             ),
                             1,
                         );
-                        const rowHeight = lanes * (BAR_HEIGHT + BAR_GAP) + 16;
+
+                        // 完了タスク（当月の resolved チケット）
+                        const closedRaw = showCompleted
+                            ? (closedByMember[name] ?? [])
+                            : [];
+                        const closedTasks = layoutClosedTasks(
+                            closedRaw,
+                            range.start,
+                            days,
+                        );
+                        const closedLanes = closedTasks.reduce(
+                            (max, t) => Math.max(max, t.lane + 1),
+                            0,
+                        );
+
+                        const totalLanes = openLanes + closedLanes;
+                        const rowHeight =
+                            totalLanes * (BAR_HEIGHT + BAR_GAP) + 16;
+                        const closedOffsetY =
+                            8 + openLanes * (BAR_HEIGHT + BAR_GAP);
 
                         return (
                             <div
@@ -171,6 +257,11 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                     </div>
                                     <div className="mt-1 text-xs text-gray-400">
                                         {member.tasks?.length ?? 0}件
+                                        {showCompleted && closedRaw.length > 0 && (
+                                            <span className="ml-1.5 text-teal-500">
+                                                ✓{closedRaw.length}件完了
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <div
@@ -181,6 +272,8 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                     }}
                                 >
                                     <DayGrid days={days} today={today} />
+
+                                    {/* オープンタスク */}
                                     {tasks.map((task) => {
                                         const created = parseDate(task.created);
                                         const elapsedDays = daysBetween(
@@ -261,7 +354,53 @@ export function CalendarView({ data }: { data: CalendarData }) {
                                             </a>
                                         );
                                     })}
-                                    {tasks.length === 0 && (
+
+                                    {/* 完了タスクセパレーター */}
+                                    {showCompleted && closedLanes > 0 && (
+                                        <div
+                                            className="absolute left-0 right-0 border-t border-dashed border-teal-200 dark:border-teal-800"
+                                            style={{ top: closedOffsetY - 4 }}
+                                        />
+                                    )}
+
+                                    {/* 完了タスク */}
+                                    {closedTasks.map((task) => {
+                                        const tooltip = [
+                                            `✓ ${task.key} · ${task.summary}`,
+                                            `完了日: ${formatMonthDay(task.resolvedDate)}`,
+                                            task.lead_time_days != null
+                                                ? `リードタイム: ${task.lead_time_days}日`
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join("\n");
+                                        return (
+                                            <a
+                                                key={`closed-${name}-${task.key}`}
+                                                href={task.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title={tooltip}
+                                                className="absolute flex items-center rounded-lg border border-teal-400 dark:border-teal-600 bg-teal-100 dark:bg-teal-900/60 px-2 text-[11px] font-medium text-teal-800 dark:text-teal-200 shadow-sm transition-transform hover:-translate-y-0.5 hover:shadow"
+                                                style={{
+                                                    left: task.left,
+                                                    top:
+                                                        closedOffsetY +
+                                                        task.lane *
+                                                            (BAR_HEIGHT +
+                                                                BAR_GAP),
+                                                    width: task.width,
+                                                    height: BAR_HEIGHT,
+                                                }}
+                                            >
+                                                <span className="truncate">
+                                                    ✓ {task.key} · {task.summary}
+                                                </span>
+                                            </a>
+                                        );
+                                    })}
+
+                                    {tasks.length === 0 && !showCompleted && (
                                         <div className="flex h-full items-center px-4 text-xs text-gray-400">
                                             表示範囲内のタスクはありません
                                         </div>
@@ -413,6 +552,42 @@ function layoutTasks(
     }
 
     return visible;
+}
+
+function layoutClosedTasks(
+    tickets: ClosedTicketRaw[],
+    rangeStart: Date,
+    days: Date[],
+): ClosedVisibleTask[] {
+    if (days.length === 0) return [];
+    const result: ClosedVisibleTask[] = tickets
+        .filter((t) => !!t.resolved_at)
+        .map((t) => {
+            const resolvedDate = startOfDay(new Date(t.resolved_at!));
+            const dayIndex = daysBetween(rangeStart, resolvedDate);
+            const left = dayIndex * DAY_COLUMN_WIDTH + 2;
+            return {
+                ...t,
+                resolvedDate,
+                lane: 0,
+                left,
+                width: DAY_COLUMN_WIDTH - 4,
+            };
+        })
+        .sort((a, b) => a.resolvedDate.getTime() - b.resolvedDate.getTime());
+
+    const laneEnds: Date[] = [];
+    for (const task of result) {
+        let laneIndex = laneEnds.findIndex((laneEnd) => laneEnd < task.resolvedDate);
+        if (laneIndex === -1) {
+            laneIndex = laneEnds.length;
+            laneEnds.push(task.resolvedDate);
+        } else {
+            laneEnds[laneIndex] = task.resolvedDate;
+        }
+        task.lane = laneIndex;
+    }
+    return result;
 }
 
 function getTaskClassName(task: VisibleTask, today: Date) {

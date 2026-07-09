@@ -6,11 +6,9 @@ import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview" },
-  { href: "/members", label: "Members" },
   { href: "/calendar", label: "Calendar" },
   { href: "/closed", label: "Closed" },
-  { href: "/ranking", label: "Ranking" },
-  { href: "/cohort", label: "Cohort" },
+  { href: "/health", label: "Health" },
 ];
 
 export function Nav({ userMenu }: { userMenu?: ReactNode }) {

@@ -112,6 +112,8 @@ GitHub PAT は **Fine-grained token** で `Actions: Read and write` 権限のみ
 - 完了系ステータス: `Done` / `完了` / `Close` / `Resolved` / `解決済み` / `リリース済み`
 - 週報の「今週」はカレンダー週ではなく、実行時点から遡った直近7日間
 - 日報で当日更新のない担当者は末尾にまとめて表示
+- 担当者別集計は、クローズ後の自動再担当を避けるため changelog からクローズ時点の assignee を復元して数える
+- `/closed` には `assignee_source` を出して、changelog 由来か current fallback かを確認できるようにしている
 - ダッシュボードのリードタイム集計は、対象期間内に **created** されたチケットのみを母集団とする（期間を跨いで開いた古いチケットは件数には含めるが、平均/中央値の計算から除外）。透明性のため各エントリに `excluded_old_count` を含める
 - ダッシュボードのリードタイムは P95 を超える外れ値を除外したうえで平均/中央値を算出。各エントリに `outlier_count` / `p95_threshold` / `raw_count` を含める。サンプル数 < 5 の場合は除外なし
 - カレンダー画面のバーは Jira の **Start Date**（`JIRA_START_DATE_FIELD`、既定 `customfield_10015`）を開始日、**Due Date** を終了日として使用。未設定の場合は `created` / `today` にフォールバックし、両方未設定のチケットは点線枠で表示する。期限が表示月外にある期限超過チケットはバー右側に元の期限を併記。
