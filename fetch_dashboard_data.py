@@ -688,6 +688,58 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
     }
 
 
+def build_weekly_closed_tickets(client: JiraClient, conf: cfg.Config) -> dict:
+    """直近数週間にクローズされたチケット一覧を返す（EPGPRD-333）。
+
+    ダッシュボードの `/closed` ページで週ごとに絞り込んで表示する用。
+    サブタスクも含む（Overview の集計と違い「何が本当に閉じたか」の生ログ）。
+    """
+    base_url = conf.base_url.rstrip("/")
+    week_ranges = _week_ranges(4)  # 直近4週分を保持
+    weeks: list[dict] = []
+    for start, end in week_ranges:
+        issues = _get_closed_in_range(client, conf, start, end)
+        tickets = []
+        for issue in issues:
+            fields = issue.get("fields") or {}
+            created_str = fields.get("created")
+            resolved_str = fields.get("resolutiondate")
+            lead_time_days = None
+            if created_str and resolved_str:
+                delta = (_parse_jira_dt(resolved_str) - _parse_jira_dt(created_str)).total_seconds()
+                if delta >= 0:
+                    lead_time_days = round(delta / 86400.0, 1)
+            issuetype = (fields.get("issuetype") or {}).get("name", "")
+            resolved_date = None
+            if resolved_str:
+                try:
+                    resolved_date = _parse_jira_dt(resolved_str).strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    resolved_date = resolved_str[:16]
+            tickets.append({
+                "key": issue["key"],
+                "summary": fields.get("summary", ""),
+                "assignee": _assignee_name(issue),
+                "issuetype": issuetype,
+                "is_subtask": _is_subtask(issue),
+                "resolved_at": resolved_date,
+                "lead_time_days": lead_time_days,
+                "url": f"{base_url}/browse/{issue['key']}",
+            })
+        # 完了日時が新しい順
+        tickets.sort(key=lambda t: t["resolved_at"] or "", reverse=True)
+        weeks.append({
+            "week_start": start.strftime("%Y-%m-%d"),
+            "week_end": end.strftime("%Y-%m-%d"),
+            "label": start.strftime("%m/%d"),
+            "count": len(tickets),
+            "tickets": tickets,
+        })
+    # 新しい週が先頭に来るように反転
+    weeks.reverse()
+    return {"weeks": weeks}
+
+
 def build_label_cohort_data(client: JiraClient, conf: cfg.Config) -> dict:
     """期間ラベル別の総数・閉じ率・継続率を生成"""
     cohorts = []
@@ -781,10 +833,14 @@ def main():
     label_cohort = build_label_cohort_data(client, conf)
     _write(out_dir / "label_cohort.json", label_cohort)
 
-    meta = {"updated_at": now_str, "data_files": 9}
+    print("✅ 今週クローズ一覧を取得中...")
+    weekly_closed_tickets = build_weekly_closed_tickets(client, conf)
+    _write(out_dir / "weekly_closed_tickets.json", weekly_closed_tickets)
+
+    meta = {"updated_at": now_str, "data_files": 11}
     _write(out_dir / "meta.json", meta)
 
-    print(f"✅ 完了: {out_dir} に10ファイル出力")
+    print(f"✅ 完了: {out_dir} に11ファイル出力")
 
 
 def _write(path: Path, data):
