@@ -33,7 +33,7 @@ export function ClosedCharts({
 
   // ── メンバー別週次完了数（積み上げ棒） ──
   const members = memberStats.members ?? {};
-  const memberNames = Object.keys(members).filter((n) => n !== "未アサイン");
+  const memberNames = Object.keys(members);
   const memberWeekLabels =
     memberNames.length > 0
       ? (members[memberNames[0]]?.weeks?.map((w) => w.week) ?? [])
