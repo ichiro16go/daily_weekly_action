@@ -117,7 +117,7 @@ export default function OverviewPage() {
             />
           );
         })()}
-        <MetricCard label="リードタイム(中央値)" value={`${team.monthly_leadtime?.at(-1)?.median_days ?? "-"}日`} />
+        <MetricCard label="今月 LT中央値" value={`${team.monthly_leadtime?.at(-1)?.median_days ?? "-"}日`} />
       </div>
 
       {wip.members?.some((m) => m.over_limit) && (
