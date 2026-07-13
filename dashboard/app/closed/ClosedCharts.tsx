@@ -33,17 +33,26 @@ export function ClosedCharts({
 
   // ── メンバー別週次完了数（積み上げ棒） ──
   const members = memberStats.members ?? {};
-  const memberNames = Object.keys(members).filter((n) => n !== "未アサイン");
-  const memberWeekLabels =
-    memberNames.length > 0
-      ? (members[memberNames[0]]?.weeks?.map((w) => w.week) ?? [])
-      : [];
-  const memberDatasets = memberNames.map((name, i) => ({
-    label: name,
-    data: members[name]?.weeks?.map((w) => w.closed) ?? [],
-    backgroundColor: MEMBER_COLORS[i % MEMBER_COLORS.length],
-    stack: "stack",
-  }));
+  const memberNames = Object.keys(members);
+
+  // 全メンバーのweekを union して共通ラベルを作る（参加時期がメンバーごとに異なるため）
+  const allWeekSet = new Set<string>();
+  for (const v of Object.values(members)) {
+    for (const w of v.weeks ?? []) allWeekSet.add(w.week);
+  }
+  const memberWeekLabels = [...allWeekSet].sort();
+
+  const memberDatasets = memberNames.map((name, i) => {
+    const weekMap = new Map(
+      (members[name]?.weeks ?? []).map((w) => [w.week, w.closed])
+    );
+    return {
+      label: name,
+      data: memberWeekLabels.map((week) => weekMap.get(week) ?? 0),
+      backgroundColor: MEMBER_COLORS[i % MEMBER_COLORS.length],
+      stack: "stack",
+    };
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -597,7 +597,7 @@ def _calc_lead_time_trend(
 
 # KPI 目標設定（config化したい場合は config.py に移動）
 _KPI_TARGET_WEEKLY_CLOSED = 9.0    # 週完了数目標
-_KPI_TARGET_LT_MEDIAN = 14.0      # リードタイム中央値目標（日）
+_KPI_TARGET_LT_MEDIAN = 21.0      # リードタイム中央値目標（日）
 
 # 半期の境界
 _HALF_YEAR_BOUNDARIES = {
@@ -635,7 +635,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
     # ラベルフィルタ
     label_filter = ""
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f' AND labels IN ({quoted})'
 
     # 今半期の完了数
@@ -692,7 +692,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
 def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     # ラベルフィルタ構築（OR）: labels IN ("運用保守", "運用保守保留案件")
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f"labels IN ({quoted})"
     else:
         label_filter = ""
