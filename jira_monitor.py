@@ -635,7 +635,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
     # ラベルフィルタ
     label_filter = ""
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f' AND labels IN ({quoted})'
 
     # 今半期の完了数
@@ -692,7 +692,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
 def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     # ラベルフィルタ構築（OR）: labels IN ("運用保守", "運用保守保留案件")
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f"labels IN ({quoted})"
     else:
         label_filter = ""
