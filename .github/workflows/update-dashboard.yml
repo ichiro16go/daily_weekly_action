@@ -34,13 +34,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
 
       - name: Install pnpm
         run: corepack enable && corepack prepare pnpm@9.12.3 --activate
 
       - name: Install Vercel CLI
-        run: npm install -g vercel@39.1.0
+        run: npm install -g vercel@latest
 
       - name: Pull Vercel Environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}

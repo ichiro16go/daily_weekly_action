@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -47,8 +48,18 @@ class GetCreatedInRangeJqlTests(unittest.TestCase):
         self.assertIn("created >= ", called_jql)
         self.assertIn("created < ", called_jql)
 
-    def test_includes_label_filter(self) -> None:
+    def test_omits_label_filter_by_default(self) -> None:
         fdd._get_created_in_range(self.client, self.conf, self.start, self.end)
+        called_jql = self.client.count.call_args[0][0]
+        self.assertNotIn('labels IN ("運用保守")', called_jql)
+
+    def test_can_enable_label_filter_via_env(self) -> None:
+        with patch.dict(
+            fdd.os.environ,
+            {"DASHBOARD_USE_WEEKLY_LABEL_FILTER": "true"},
+            clear=False,
+        ):
+            fdd._get_created_in_range(self.client, self.conf, self.start, self.end)
         called_jql = self.client.count.call_args[0][0]
         self.assertIn('labels IN ("運用保守")', called_jql)
 
