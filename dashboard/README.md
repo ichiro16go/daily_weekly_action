@@ -60,6 +60,7 @@ cp .env.example .env
 #   JIRA_EMAIL=your@email.com
 #   JIRA_API_TOKEN=your-api-token
 #   WEEKLY_LABELS=運用保守,運用保守保留案件
+#   DASHBOARD_USE_WEEKLY_LABEL_FILTER=true  # 必要なときだけ有効化
 
 # データ取得（Jira APIにアクセス）
 python3 fetch_dashboard_data.py
@@ -147,7 +148,7 @@ cd dashboard && npm run build && npm run start
 
 | KPI | 目標 | 測定方法 |
 |-----|------|----------|
-| 週完了数 | **9件/週** | `resolved` フィールドで計測、ボードメンバー8名+ラベルフィルタ |
+| 週完了数 | **9件/週** | `resolved` フィールドで計測（既定はラベル制限なし） |
 | リードタイム中央値 | **14日以下** | `resolutiondate - created` の中央値 |
 
 目標値は `jira_monitor.py` の `_KPI_TARGET_WEEKLY_CLOSED` / `_KPI_TARGET_LT_MEDIAN` で定義。
@@ -158,7 +159,7 @@ cd dashboard && npm run build && npm run start
 |---------------|----------|
 | KPI 目標値 | `jira_monitor.py` の `_KPI_TARGET_*` 定数 |
 | ボードメンバー | `config.py` の `BOARD_MEMBER_BASE_JQL` |
-| ラベルフィルタ | `.env` の `WEEKLY_LABELS` |
+| ラベルフィルタ | `.env` の `DASHBOARD_USE_WEEKLY_LABEL_FILTER=true` で有効化 |
 | WIP 上限 | `.env` の `WIP_LIMIT`（デフォルト: 5） |
 | データ取得範囲 | `fetch_dashboard_data.py` の `_week_ranges(26)` / `_month_ranges(6)` |
 

@@ -1,70 +1,61 @@
 [
   {
+    "key": "EPWAIT-12184",
+    "summary": "テコラス肥大化テーブルの自動削除スクリプト作成",
+    "assignee": "加川 頼人",
+    "status": "ペンディング",
+    "created": "2020-01-14",
+    "days_since_created": 2372,
+    "url": "https://epark-tech.atlassian.net/browse/EPWAIT-12184"
+  },
+  {
     "key": "FASPACLOUD-1080",
     "summary": "宇治徳洲会病院の診察券番号削除",
     "assignee": "加川 頼人",
     "status": "In PROGRESS",
     "created": "2020-04-20",
-    "days_since_created": 2271,
+    "days_since_created": 2275,
     "url": "https://epark-tech.atlassian.net/browse/FASPACLOUD-1080"
   },
   {
-    "key": "JPREQ-71",
-    "summary": "※未解決※【営業部UAT不具合】管理画面の店舗写真掲載を複数行おうとすると、画像名称は先頭の設定を引用している",
+    "key": "EPWAIT-16464",
+    "summary": "時間指定店舗 翌日以降の予約ボタン:有り で画面崩れ",
+    "assignee": "加川 頼人",
+    "status": "オープン",
+    "created": "2021-03-09",
+    "days_since_created": 1951,
+    "url": "https://epark-tech.atlassian.net/browse/EPWAIT-16464"
+  },
+  {
+    "key": "GRMREQ-3187",
+    "summary": "【仕様変更要望】待ちが少ない方の部門の待ち組数を表示する仕様を変更したい",
+    "assignee": "鈴鹿 千津子",
+    "status": "オープン",
+    "created": "2022-03-01",
+    "days_since_created": 1595,
+    "url": "https://epark-tech.atlassian.net/browse/GRMREQ-3187"
+  },
+  {
+    "key": "JUSTPASS-4461",
+    "summary": "【管理画面_STバグ】265_1101.アカウント一覧_状態を何も選択せず検索しても「運用中」の結果が表示される",
     "assignee": "鈴鹿 千津子",
     "status": "再オープン",
-    "created": "2022-08-16",
-    "days_since_created": 1422,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-71"
+    "created": "2022-06-28",
+    "days_since_created": 1476,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-4461"
   },
   {
-    "key": "JPREQ-129",
-    "summary": "【営業部UAT不具合】前日までの受付データが完了or不在にならずそのまま残っている",
-    "assignee": "未アサイン",
+    "key": "JUSTPASS-4735",
+    "summary": "【管理画面_STバグ】予約シナリオ登録_予約種別・受付経路種別・言語で一意の制限がなく重複したシナリオが作成できる_仕様考慮漏れ",
+    "assignee": "鈴鹿 千津子",
     "status": "ペンディング",
-    "created": "2022-08-22",
-    "days_since_created": 1416,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-129"
+    "created": "2022-07-07",
+    "days_since_created": 1467,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-4735"
   },
   {
-    "key": "JPREQ-142",
-    "summary": "【不具合】チケットが発券されない際のエラーメッセージが表示されない",
-    "assignee": "鈴鹿 千津子",
-    "status": "改修確認中",
-    "created": "2022-08-23",
-    "days_since_created": 1416,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-142"
-  },
-  {
-    "key": "JPREQ-145",
-    "summary": "【不具合】メールでクーポンを送る際のナンバリングが不適切",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-08-24",
-    "days_since_created": 1415,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-145"
-  },
-  {
-    "key": "JUSTPASS-5939",
-    "summary": "【管理画面_PH1残】ADM_SCRN_9109_01.メール配信設定詳細・確認ページ共通(クーポン詳細タブ)_クーポンの見出しが編集画面と異なる",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-08-24",
-    "days_since_created": 1414,
-    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5939"
-  },
-  {
-    "key": "JUSTPASS-5957",
-    "summary": "【管理画面_PH1残】メール初期設定一覧_キーワード空で検索すると「検索条件を入力してください」が表示される。",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-08-25",
-    "days_since_created": 1414,
-    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5957"
-  },
-  {
-    "key": "JPREQ-168",
-    "summary": "【入り込み要望】席状況で受付とスタッフに反映される速度を早くしたい",
+    "key": "JUSTPASS-4827",
+    "summary": "将来順番待ち基本設定の「停止中メッセージ」の揺れ",
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
     "created": "2022-08-29",
@@ -72,8 +63,8 @@
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-168"
   },
   {
-    "key": "JPREQ-170",
-    "summary": "【入り込み要望】スタッフ画面からの入力で人数をテンキーにしたい",
+    "key": "JUSTPASS-4831",
+    "summary": "店舗一括入稿の入稿用フォーマット",
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
     "created": "2022-08-29",
@@ -81,94 +72,103 @@
     "url": "https://epark-tech.atlassian.net/browse/JPREQ-170"
   },
   {
-    "key": "JPREQ-180",
-    "summary": "【不具合】配信タイプが通常のメール配信においての挙動がおかしい",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-08-29",
-    "days_since_created": 1409,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-180"
-  },
-  {
-    "key": "JPREQ-181",
-    "summary": "【不具合】社外アカウントで店舗名が変更されてもアカウント名が変わらない",
-    "assignee": "鈴鹿 千津子",
-    "status": "再オープン",
-    "created": "2022-08-29",
-    "days_since_created": 1409,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-181"
-  },
-  {
-    "key": "JPREQ-183",
-    "summary": "【入り込み要望】複合席の反応が上に表示された受付しかモーダルが表示されないので下に表示されたものも反応して欲しい",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-08-29",
-    "days_since_created": 1409,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-183"
-  },
-  {
-    "key": "JPREQ-184",
-    "summary": "【不具合】店舗アカウントで基本情報編集が可能となっている",
-    "assignee": "鈴鹿 千津子",
-    "status": "割当済み",
-    "created": "2022-08-29",
-    "days_since_created": 1409,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-184"
-  },
-  {
-    "key": "JPREQ-185",
-    "summary": "【不具合】店舗アカウントで自店の店舗情報編集を押下すると編集出来ない項目が表示されている",
-    "assignee": "鈴鹿 千津子",
-    "status": "調査中",
-    "created": "2022-08-29",
-    "days_since_created": 1409,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-185"
-  },
-  {
-    "key": "JPREQ-213",
-    "summary": "不在戻しをした際、順番待ち画面の一番上にフォーカスされず、一覧画面中～下部にフォーカスされている",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-09-08",
-    "days_since_created": 1400,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-213"
-  },
-  {
-    "key": "JPREQ-215",
-    "summary": "特定の受付情報に対して、臨時で滞在時間を延ばせるような内容が欲しい",
+    "key": "JUSTPASS-5046",
+    "summary": "【管理画面_ST】予約シナリオ編集画面_表示選択条件で数値を選択した場合、該当予約カテゴリ（数値）の範囲外でも選択が可能になっている",
     "assignee": "鈴鹿 千津子",
     "status": "ペンディング",
-    "created": "2022-09-08",
-    "days_since_created": 1400,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-215"
+    "created": "2022-07-19",
+    "days_since_created": 1454,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5046"
   },
   {
-    "key": "JPREQ-226",
-    "summary": "【不具合】新着予約の機能が要望と異なっていそう",
+    "key": "JUSTPASS-5476",
+    "summary": "【メディア_ST】将来順番待ち_予約カテゴリ注意書きが表示されない",
     "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-09-09",
-    "days_since_created": 1398,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-226"
+    "status": "再オープン",
+    "created": "2022-08-05",
+    "days_since_created": 1438,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5476"
   },
   {
-    "key": "JPREQ-242",
-    "summary": "ユーザー画面：予約完了画面のマイページの表記",
-    "assignee": "鈴鹿 千津子",
-    "status": "オープン",
-    "created": "2022-09-22",
-    "days_since_created": 1385,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-242"
+    "key": "JPREQ-38",
+    "summary": "【営業部UAT不具合】店頭受付画面、停止中の画像がサイズあっていない",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-10",
+    "days_since_created": 1433,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-38"
   },
   {
-    "key": "JPREQ-265",
-    "summary": "【不具合】メール配信の年齢絞り込みで1つの年齢のみに配信することが出来ない",
+    "key": "JUSTPASS-5692",
+    "summary": "【管理画面_STバグ】店舗登録確認（メディア掲載用）_「メニューカテゴリ名」が未入力の場合メニューの内容が確認画面に表示されない",
+    "assignee": "鈴鹿 千津子",
+    "status": "再オープン",
+    "created": "2022-08-12",
+    "days_since_created": 1431,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5692"
+  },
+  {
+    "key": "JPREQ-71",
+    "summary": "※未解決※【営業部UAT不具合】管理画面の店舗写真掲載を複数行おうとすると、画像名称は先頭の設定を引用している",
+    "assignee": "鈴鹿 千津子",
+    "status": "再オープン",
+    "created": "2022-08-16",
+    "days_since_created": 1426,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-71"
+  },
+  {
+    "key": "JPREQ-79",
+    "summary": "【営業部UAT不具合】営業時間中に営業時間を変更すると枠設定が崩れる",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-17",
+    "days_since_created": 1426,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-79"
+  },
+  {
+    "key": "JPREQ-83",
+    "summary": "【営業部UAT不具合】案内時の配席確認画面の不具合",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-17",
+    "days_since_created": 1426,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-83"
+  },
+  {
+    "key": "JPREQ-93",
+    "summary": "【営業部UAT不具合】席状況ガイド線表示を非表示設定にしても席状況画面にトグルスイッチが表示される",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-18",
+    "days_since_created": 1425,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-93"
+  },
+  {
+    "key": "JPREQ-96",
+    "summary": "【営業部UAT不具合】接客中が前にいる状況で後ろの順番待ちを案内するとバーが重なる",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-18",
+    "days_since_created": 1425,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-96"
+  },
+  {
+    "key": "JPREQ-97",
+    "summary": "【営業部UAT不具合】不在にした受付が未配席行に入る",
+    "assignee": "未アサイン",
+    "status": "ペンディング",
+    "created": "2022-08-18",
+    "days_since_created": 1425,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-97"
+  },
+  {
+    "key": "JUSTPASS-5867",
+    "summary": "【管理画面_PH1残】チェックイン編集確認_画面名が他の画面の仕様と異なる",
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
-    "created": "2022-10-19",
-    "days_since_created": 1359,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-265"
+    "created": "2022-08-18",
+    "days_since_created": 1424,
+    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5867"
   },
   {
     "key": "JPREQ-277",
