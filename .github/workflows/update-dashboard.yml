@@ -34,10 +34,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@9.12.3 --activate
+        run: corepack enable && corepack prepare pnpm@10 --activate
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest

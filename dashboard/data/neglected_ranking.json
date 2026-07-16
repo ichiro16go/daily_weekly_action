@@ -58,18 +58,18 @@
     "summary": "将来順番待ち基本設定の「停止中メッセージ」の揺れ",
     "assignee": "鈴鹿 千津子",
     "status": "オープン",
-    "created": "2022-07-08",
-    "days_since_created": 1466,
-    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-4827"
+    "created": "2022-08-29",
+    "days_since_created": 1410,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-168"
   },
   {
     "key": "JUSTPASS-4831",
     "summary": "店舗一括入稿の入稿用フォーマット",
     "assignee": "鈴鹿 千津子",
-    "status": "ペンディング",
-    "created": "2022-07-08",
-    "days_since_created": 1466,
-    "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-4831"
+    "status": "オープン",
+    "created": "2022-08-29",
+    "days_since_created": 1410,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-170"
   },
   {
     "key": "JUSTPASS-5046",
@@ -171,12 +171,12 @@
     "url": "https://epark-tech.atlassian.net/browse/JUSTPASS-5867"
   },
   {
-    "key": "JPREQ-99",
-    "summary": "【営業部UAT不具合】スタッフ画面からの将来順番受付の作成途中キャンセル→未配席行に受付が出来る",
-    "assignee": "未アサイン",
-    "status": "ペンディング",
-    "created": "2022-08-18",
-    "days_since_created": 1424,
-    "url": "https://epark-tech.atlassian.net/browse/JPREQ-99"
+    "key": "JPREQ-277",
+    "summary": "【不具合】予約シナリオに電話呼出の同じ予約カテゴリを設定すると受付が出来なくなる",
+    "assignee": "鈴鹿 千津子",
+    "status": "再オープン",
+    "created": "2022-11-09",
+    "days_since_created": 1338,
+    "url": "https://epark-tech.atlassian.net/browse/JPREQ-277"
   }
 ]

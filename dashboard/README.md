@@ -44,7 +44,7 @@ Jira のデータを日次で集計し、チームのパフォーマンスを可
 
 ### 前提条件
 
-- Node.js 20.x（Vercel の実行環境も `package.json` の `engines.node` で 20.x に固定）
+- Node.js 24.x
 - Python 3.12+
 - Jira Cloud の API トークン
 
@@ -77,7 +77,7 @@ pnpm dev
 1. **Vercel でプロジェクト作成**
    - Framework: Next.js
    - Root Directory: `dashboard`
-   - Node.js Version: `20.x`
+   - Node.js Version: `24.x`
 
 2. **GitHub リポジトリの Secrets 設定**
 
