@@ -102,6 +102,7 @@ class WeeklySummary:
     trend_4w: list[int]  # [3週前, 2週前, 先週, 今週] のクローズ件数
     assignee_stats: list[AssigneeStat]
     new_tickets: list[TicketBrief] = None  # 新規起票チケット一覧
+    upcoming_tasks: list[TicketBrief] = None  # 当月〜9月末の予定タスク
     label_filter_name: str = ""               # 適用したラベル名（表示用）
     lead_time_trend: list[LeadTimeStat] = None   # 月次リードタイム推移
     wip_violations: list[WipViolation] = None    # WIP上限超過者
@@ -635,7 +636,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
     # ラベルフィルタ
     label_filter = ""
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f' AND labels IN ({quoted})'
 
     # 今半期の完了数
@@ -692,7 +693,7 @@ def _calc_kpi_progress(client: JiraClient, conf: cfg.Config) -> KpiProgress:
 def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
     # ラベルフィルタ構築（OR）: labels IN ("運用保守", "運用保守保留案件")
     if conf.weekly_labels:
-        quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
+        quoted = ", ".join(_jql_quote(l) for l in conf.weekly_labels)
         label_filter = f"labels IN ({quoted})"
     else:
         label_filter = ""
@@ -707,6 +708,9 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
 
     period_end = datetime.now(tz=JST).replace(second=0, microsecond=0)
     period_start = period_end - timedelta(days=7)
+    start_of_month = period_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    due_end_year = period_end.year if period_end.month <= 9 else period_end.year + 1
+    due_end = datetime(due_end_year, 9, 30, 23, 59, 59, tzinfo=JST)
     period_start_jql = _jql_datetime(period_start)
     period_end_jql = _jql_datetime(period_end)
     resolved_period_jql = _resolved_jql(period_start, period_end)
@@ -733,6 +737,19 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         max_results=20,
     )
     new_tickets = [_brief(issue) for issue in new_ticket_issues]
+    upcoming_jql = (
+        f'duedate >= "{start_of_month.strftime("%Y-%m-%d")}" '
+        f'AND duedate <= "{due_end.strftime("%Y-%m-%d")}"'
+    )
+    upcoming_issue_issues = client.search(
+        conf.board_jql(_and_label(upcoming_jql), order_by="duedate ASC"),
+        ["summary", "assignee", "duedate"],
+        max_results=20,
+    )
+    upcoming_tasks = [
+        _brief(issue, detail=f"期限: {issue['fields'].get('duedate') or '-'}")
+        for issue in upcoming_issue_issues
+    ]
 
     # 4週分クローズ件数トレンド（resolved ベース）
     trend_4w = []
@@ -847,6 +864,10 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
                 order_by="updated ASC",
             ),
         ),
+        "upcoming_tasks": _jira_filter_url(
+            conf.base_url,
+            conf.board_jql(_and_label(upcoming_jql), order_by="duedate ASC"),
+        ),
     }
 
     return WeeklySummary(
@@ -863,6 +884,7 @@ def build_weekly_summary(client: JiraClient, conf: cfg.Config) -> WeeklySummary:
         trend_4w=trend_4w,
         assignee_stats=assignee_stats,
         new_tickets=new_tickets,
+        upcoming_tasks=upcoming_tasks,
         label_filter_name=", ".join(conf.weekly_labels) if conf.weekly_labels else "",
         lead_time_trend=lead_time_trend,
         wip_violations=wip_violations,
@@ -1106,6 +1128,14 @@ def format_weekly(s: WeeklySummary) -> str:
         lines.append(f"  …他 {s.unassigned_count - len(s.unassigned)}件")
     lines += [
         "",
+        f"📅 今後の予定タスク（当月〜9月末）— {len(s.upcoming_tasks or [])}件",
+    ]
+    for t in (s.upcoming_tasks or [])[:10]:
+        lines.append(f"  {t.key}  {t.assignee}  {t.detail}  {t.summary}")
+    if (s.upcoming_tasks or []) and len(s.upcoming_tasks) > 10:
+        lines.append(f"  …他 {len(s.upcoming_tasks) - 10}件")
+    lines += [
+        "",
         f"🚨 滞留チケット（7日以上 IN PROGRESS）— {len(s.stale)}件",
     ]
     for t in s.stale[:5]:
@@ -1207,6 +1237,19 @@ def format_weekly_blocks(s: WeeklySummary, conf: cfg.Config) -> list[dict]:
         if s.new_tickets_count > 10:
             new_lines.append(f"_…他 {s.new_tickets_count - 10}件_")
         blocks.append(section_block("\n".join(new_lines)))
+        blocks.append(divider_block())
+
+    # 今後の予定タスク（当月〜9月末）
+    if s.upcoming_tasks:
+        plan_header = f"*📅 今後の予定タスク（当月〜9月末） — {len(s.upcoming_tasks)}件*"
+        if urls.get("upcoming_tasks"):
+            plan_header += f"  <{urls['upcoming_tasks']}|（Jiraで見る）>"
+        plan_lines = [plan_header + "\n"]
+        for t in s.upcoming_tasks[:10]:
+            plan_lines.append(f"• `{t.key}` {t.assignee} — {t.summary}（{t.detail}）")
+        if len(s.upcoming_tasks) > 10:
+            plan_lines.append(f"_…他 {len(s.upcoming_tasks) - 10}件_")
+        blocks.append(section_block("\n".join(plan_lines)))
         blocks.append(divider_block())
 
     # クローズ件数トレンド（棒グラフ風）
