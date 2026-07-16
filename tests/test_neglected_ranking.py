@@ -58,7 +58,7 @@ class BuildNeglectedRankingTests(unittest.TestCase):
         self.assertEqual([item["key"] for item in result], ["EPGPRD-1", "EPGPRD-3", "EPGPRD-2"])
         self.assertEqual(result[0]["created"], (datetime.now(tz=fdd.JST) - timedelta(days=30)).strftime("%Y-%m-%d"))
         self.assertIn("statusCategory != Done", client.calls[0][0])
-        self.assertIn('labels IN ("運用保守")', client.calls[0][0])
+        self.assertNotIn('labels IN ("運用保守")', client.calls[0][0])
         self.assertIn("ORDER BY created ASC", client.calls[0][0])
         self.assertEqual(client.calls[0][1], ["summary", "assignee", "status", "created", "issuetype"])
 

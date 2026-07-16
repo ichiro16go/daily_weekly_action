@@ -35,6 +35,19 @@ def _is_subtask(issue) -> bool:
     return bool(issuetype.get("subtask"))
 
 
+def _dashboard_uses_weekly_label_filter() -> bool:
+    """dashboard 用集計で weekly label 制限を使うかを返す（既定は無効）。"""
+    raw = os.environ.get("DASHBOARD_USE_WEEKLY_LABEL_FILTER", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _dashboard_label_filter(conf: cfg.Config) -> str:
+    """dashboard 用のラベルフィルタを返す。既定では無効化して全件を拾う。"""
+    if not _dashboard_uses_weekly_label_filter():
+        return ""
+    return _label_filter(conf)
+
+
 def _calc_leadtime(issues, end, *, exclude_subtasks: bool = True):
     """
     与えられた issues 群（指定期間にクローズされたもの）からリードタイム日数のリストを返す。
@@ -184,7 +197,7 @@ def _label_cohort_labels(conf: "cfg.Config | None" = None, months: int = 18) -> 
 def _get_closed_in_range(client: JiraClient, conf: cfg.Config, start, end, expand: str | None = None):
     """指定期間にクローズされたチケットを返す（resolved フィールドベース）"""
     jql = conf.board_member_jql(
-        f'{_resolved_jql(start, end)}{_label_filter(conf)}'
+        f'{_resolved_jql(start, end)}{_dashboard_label_filter(conf)}'
     )
     return client.search(
         jql,
@@ -203,7 +216,7 @@ def _get_created_in_range(client: JiraClient, conf: cfg.Config, start, end):
     """
     start_jql = _jql_datetime(start)
     end_jql = _jql_datetime(end)
-    extra = f'created >= {start_jql} AND created < {end_jql}{_label_filter(conf)}'
+    extra = f'created >= {start_jql} AND created < {end_jql}{_dashboard_label_filter(conf)}'
     jql = conf.board_member_jql(extra)
     return client.count(jql)
 
@@ -217,7 +230,7 @@ def _safe_rate(numerator: int, denominator: int) -> float:
 
 def _get_in_progress(client: JiraClient, conf: cfg.Config):
     """現在IN PROGRESSのチケットを返す（ラベルフィルタ適用）"""
-    extra = f'status = "In Progress"{_label_filter(conf)}'
+    extra = f'status = "In Progress"{_dashboard_label_filter(conf)}'
     jql = conf.board_member_jql(extra, order_by="assignee ASC")
     return client.search(jql, ["summary", "assignee", "created", "updated", "duedate"], max_results=200)
 
@@ -463,7 +476,7 @@ def build_member_leadtime(client: JiraClient, conf: cfg.Config) -> dict:
 def build_stale_ranking(client: JiraClient, conf: cfg.Config) -> list:
     """滞留チケットランキング"""
     label_filter = ""
-    if conf.weekly_labels:
+    if _dashboard_uses_weekly_label_filter() and conf.weekly_labels:
         quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
         label_filter = f'labels IN ({quoted})'
     stale = check_stale(client, conf, stale_days=3, extra_filter=label_filter)
@@ -484,7 +497,7 @@ def build_overdue_ranking(client: JiraClient, conf: cfg.Config) -> list:
     """期限超過チケットランキング"""
     now = datetime.now(tz=JST)
     jql = conf.board_jql(
-        f'duedate < "{now.strftime("%Y-%m-%d")}" AND duedate IS NOT EMPTY{_label_filter(conf)}',
+        f'duedate < "{now.strftime("%Y-%m-%d")}" AND duedate IS NOT EMPTY{_dashboard_label_filter(conf)}',
         order_by="duedate ASC"
     )
     issues = client.search(jql, ["summary", "assignee", "duedate"], max_results=50)
@@ -511,7 +524,7 @@ def build_neglected_ranking(client: JiraClient, conf: cfg.Config) -> list[dict]:
     """未完了チケットを起票日からの経過日数順に返す"""
     now = datetime.now(tz=JST)
     jql = conf.board_member_jql(
-        f"statusCategory != Done{_label_filter(conf)}",
+        f"statusCategory != Done{_dashboard_label_filter(conf)}",
         order_by="created ASC"
     )
     issues = client.search(jql, ["summary", "assignee", "status", "created", "issuetype"], max_results=1000)
@@ -570,7 +583,7 @@ def build_wip_status(client: JiraClient, conf: cfg.Config) -> dict:
 def build_calendar_data(client: JiraClient, conf: cfg.Config) -> dict:
     """メンバーごとの未完了チケットをカレンダー表示用に整形"""
     # overviewの「対応中」と同じフィルタ（In Progress + ラベル）を使用
-    extra = f'status = "In Progress"{_label_filter(conf)}'
+    extra = f'status = "In Progress"{_dashboard_label_filter(conf)}'
     fields = ["summary", "assignee", "status", "duedate", "created", "updated", "priority"]
     start_field = (conf.start_date_field or "").strip()
     end_field = (conf.end_date_field or "").strip()
@@ -690,7 +703,7 @@ def build_kpi_data(client: JiraClient, conf: cfg.Config) -> dict:
 
     # ラベルフィルタ
     label_filter = ""
-    if conf.weekly_labels:
+    if _dashboard_uses_weekly_label_filter() and conf.weekly_labels:
         quoted = ", ".join(f'"{l}"' for l in conf.weekly_labels)
         label_filter = f' AND labels IN ({quoted})'
 
